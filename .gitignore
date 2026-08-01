@@ -1,0 +1,8 @@
+build/
+.cache/
+*.o
+*.a
+
+# Absolute paths inside make it machine-specific. Regenerate with
+# tools/gen-compile-commands.zsh rather than committing it.
+compile_commands.json
