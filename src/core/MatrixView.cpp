@@ -9,17 +9,13 @@ namespace linalg {
 
 template <typename T>
 MatrixView<T>::MatrixView()
-    : data_(nullptr), rows_(0), cols_(0), rowStride_(0), colStride_(0) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::MatrixView");
-}
+    : data_(nullptr), rows_(0), cols_(0), rowStride_(0), colStride_(0) {}
 
 template <typename T>
 MatrixView<T>::MatrixView(T *data, Index rows, Index cols, Index rowStride,
                           Index colStride)
     : data_(data), rows_(rows), cols_(cols), rowStride_(rowStride),
-      colStride_(colStride) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::MatrixView");
-}
+      colStride_(colStride) {}
 
 template <typename T>
 MatrixView<T>::MatrixView(const MatrixView &other)
@@ -48,89 +44,136 @@ MatrixView<T> &MatrixView<T>::operator=(const MatrixView &other) {
 
 template <typename T>
 MatrixView<T> &MatrixView<T>::operator=(MatrixView &&other) noexcept {
-    // TODO: transfer ownership from `other`. Declared noexcept,
-    // so this stub cannot throw the way the others do.
+    // Rebinds this view to `other`'s storage (shallow; a view is
+    // non-owning, so there is nothing to free). Guard against self-move,
+    // then clear `other` to leave it empty.
+    if (this != &other) {
+        data_ = other.data_;
+        rows_ = other.rows_;
+        cols_ = other.cols_;
+        rowStride_ = other.rowStride_;
+        colStride_ = other.colStride_;
+        other.data_ = nullptr;
+        other.rows_ = 0;
+        other.cols_ = 0;
+        other.rowStride_ = 0;
+        other.colStride_ = 0;
+    }
     return *this;
 }
 
 template <typename T>
 MatrixView<T> &MatrixView<T>::operator=(const Matrix<T> &source) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::operator=");
+    // Copies *elements* into the storage this view already refers to; the
+    // binding (data_/strides) is untouched. Shapes must match exactly.
+    if (rows_ != source.rows() || cols_ != source.cols()) {
+        throw DimensionMismatch(rows_, cols_, source.rows(), source.cols());
+    }
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            data_[i * rowStride_ + j * colStride_] = source(i, j);
+        }
+    }
+    return *this;
 }
 
 template <typename T> T &MatrixView<T>::operator()(Index i, Index j) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::operator()");
+    return data_[i * rowStride_ + j * colStride_];
 }
 
 template <typename T>
 const T &MatrixView<T>::operator()(Index i, Index j) const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::operator()");
+    return data_[i * rowStride_ + j * colStride_];
 }
 
 template <typename T> T &MatrixView<T>::at(Index i, Index j) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::at");
+    if (i >= rows_) {
+        throw IndexOutOfRange(i, rows_);
+    }
+    if (j >= cols_) {
+        throw IndexOutOfRange(j, cols_);
+    }
+    return data_[i * rowStride_ + j * colStride_];
 }
 
 template <typename T> const T &MatrixView<T>::at(Index i, Index j) const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::at");
+    if (i >= rows_) {
+        throw IndexOutOfRange(i, rows_);
+    }
+    if (j >= cols_) {
+        throw IndexOutOfRange(j, cols_);
+    }
+    return data_[i * rowStride_ + j * colStride_];
 }
 
 template <typename T>
 typename MatrixView<T>::Index MatrixView<T>::rows() const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::rows");
+    return rows_;
 }
 
 template <typename T>
 typename MatrixView<T>::Index MatrixView<T>::cols() const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::cols");
+    return cols_;
 }
 
 template <typename T>
 typename MatrixView<T>::Index MatrixView<T>::rowStride() const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::rowStride");
+    return rowStride_;
 }
 
 template <typename T>
 typename MatrixView<T>::Index MatrixView<T>::colStride() const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::colStride");
+    return colStride_;
 }
 
 template <typename T> bool MatrixView<T>::isContiguous() const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::isContiguous");
+    return (rowStride_ == cols_ && colStride_ == 1);
 }
 
 template <typename T> bool MatrixView<T>::isEmpty() const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::isEmpty");
+    return (rows_ == 0 || cols_ == 0);
 }
 
-template <typename T> T *MatrixView<T>::data() {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::data");
-}
+template <typename T> T *MatrixView<T>::data() { return data_; }
 
-template <typename T> const T *MatrixView<T>::data() const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::data");
-}
+template <typename T> const T *MatrixView<T>::data() const { return data_; }
 
 template <typename T>
 MatrixView<T> MatrixView<T>::block(Index i, Index j, Index numRows,
                                    Index numCols) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::block");
+    // Sub-view over the same storage: rebase the pointer to element (i, j)
+    // and keep the strides, so the block sees the same layout. The block
+    // must fit; comparisons are written to avoid unsigned overflow.
+    if (i > rows_ || numRows > rows_ - i) {
+        throw IndexOutOfRange(i + numRows, rows_);
+    }
+    if (j > cols_ || numCols > cols_ - j) {
+        throw IndexOutOfRange(j + numCols, cols_);
+    }
+    return MatrixView(data_ + i * rowStride_ + j * colStride_, numRows, numCols,
+                      rowStride_, colStride_);
 }
 
 template <typename T> MatrixView<T> MatrixView<T>::row(Index i) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::row");
+    return block(i, 0, 1, cols_); // a 1 x cols_ view
 }
 
 template <typename T> MatrixView<T> MatrixView<T>::col(Index j) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::col");
+    return block(0, j, rows_, 1); // a rows_ x 1 view
 }
 
 template <typename T> MatrixView<T> MatrixView<T>::diagonal() {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::diagonal");
+    // 1 x min(rows, cols) view along the main diagonal: stepping one
+    // element advances a row and a column at once, so the column stride
+    // is rowStride_ + colStride_. Base stays at (0, 0).
+    const Index n = rows_ < cols_ ? rows_ : cols_;
+    return MatrixView(data_, 1, n, rowStride_ + colStride_,
+                      rowStride_ + colStride_);
 }
 
 template <typename T> MatrixView<T> MatrixView<T>::transposed() {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::transposed");
+    // Swap the row and column counts and strides, but keep the same base.
+    return MatrixView(data_, cols_, rows_, colStride_, rowStride_);
 }
 
 template <typename T> Matrix<T> MatrixView<T>::toMatrix() const {
@@ -138,15 +181,21 @@ template <typename T> Matrix<T> MatrixView<T>::toMatrix() const {
 }
 
 template <typename T> void MatrixView<T>::fill(const T &value) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::fill");
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            data_[i * rowStride_ + j * colStride_] = value;
+        }
+    }
 }
 
-template <typename T> void MatrixView<T>::setZero() {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::setZero");
-}
+template <typename T> void MatrixView<T>::setZero() { fill(T(0)); }
 
 template <typename T> void MatrixView<T>::scale(const T &factor) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::scale");
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            data_[i * rowStride_ + j * colStride_] *= factor;
+        }
+    }
 }
 
 template <typename T> void MatrixView<T>::swapWith(MatrixView &other) {

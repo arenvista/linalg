@@ -23,19 +23,40 @@ public:
         bool  useRayleighQuotient;  // Rayleigh-quotient estimate: squares the convergence rate for Hermitian A
     };
 
+    /// @brief Constructs a power-iteration solver with default options.
     PowerIteration();
+    /// @brief Constructs a power-iteration solver with explicit options.
+    /// @param options Iteration limit, tolerance, and Rayleigh-quotient flag.
     explicit PowerIteration(const Options& options);
 
     // Converges to the eigenvalue of largest magnitude, at a rate set by
     // |lambda_2 / lambda_1|. shiftedInverseEigenvalue finds the eigenvalue
     // nearest `shift` by iterating with (A - shift I)^-1 (one LU, reused
     // every iteration).
+    /// @brief Computes the eigenvalue of largest magnitude.
+    /// @param a The matrix.
+    /// @return The dominant eigenvalue.
     Real      dominantEigenvalue(const Matrix<T>& a);
+    /// @brief Computes the eigenvector for the eigenvalue of largest magnitude.
+    /// @param a The matrix.
+    /// @return The dominant eigenvector (unit norm).
     Vector<T> dominantEigenvector(const Matrix<T>& a);
+    /// @brief Finds the eigenvalue nearest a shift via inverse iteration.
+    /// @param a The matrix.
+    /// @param shift The target value to iterate toward.
+    /// @return The eigenvalue closest to `shift`.
     Real      shiftedInverseEigenvalue(const Matrix<T>& a, Real shift);
-    Real      rayleighQuotient(const Matrix<T>& a, const Vector<T>& x) const;  // x^H A x / x^H x
+    /// @brief Rayleigh quotient x^H A x / x^H x.
+    /// @param a The matrix.
+    /// @param x The vector.
+    /// @return The Rayleigh quotient.
+    Real      rayleighQuotient(const Matrix<T>& a, const Vector<T>& x) const;
 
+    /// @brief Number of iterations performed by the last call.
+    /// @return The iteration count.
     Index iterationsUsed() const;
+    /// @brief Reports whether the last call converged.
+    /// @return True on convergence.
     bool  converged() const;
 
 private:
@@ -61,23 +82,46 @@ public:
         enum class Kind { None, Full, Selective, Partial };
     };
 
+    /// @brief Constructs an empty Lanczos solver; call compute() before use.
     Lanczos();
+    /// @brief Constructs a Lanczos solver with a subspace size and strategy.
+    /// @param krylovDimension Maximum Krylov subspace dimension.
+    /// @param strategy Reorthogonalization strategy.
     Lanczos(Index krylovDimension, typename Reorthogonalization::Kind strategy);
 
+    /// @brief Builds the Lanczos tridiagonalization from a start vector.
+    /// @param a Hermitian matrix.
+    /// @param startVector Initial Krylov vector.
     void compute(const Matrix<T>& a, const Vector<T>& startVector);
+    /// @brief Reports whether a factorization is available.
+    /// @return True if compute() has run.
     bool isComputed() const;
 
     // Ritz values are the eigenvalues of the projected tridiagonal matrix
     // (extreme ones converge first); ritzResidualBounds gives the cheap
     // per-pair error bound |beta_m| * |last component of the projected
     // eigenvector| — no residual against A needed.
+    /// @brief Main diagonal of the projected tridiagonal matrix.
+    /// @return The diagonal entries.
     Vector<Real>  diagonal() const;
+    /// @brief Subdiagonal of the projected tridiagonal matrix.
+    /// @return The subdiagonal entries.
     Vector<Real>  subdiagonal() const;
+    /// @brief The Lanczos basis actually built.
+    /// @return The basis matrix.
     Matrix<T>     basis() const;
+    /// @brief Ritz values (eigenvalues of the projected tridiagonal).
+    /// @return The Ritz values.
     Vector<Real>  ritzValues() const;
+    /// @brief Ritz vectors (approximate eigenvectors).
+    /// @return The Ritz vectors.
     Matrix<T>     ritzVectors() const;
+    /// @brief Cheap per-pair Ritz residual bounds.
+    /// @return The residual bound for each Ritz pair.
     Vector<Real>  ritzResidualBounds() const;
-    Real          orthogonalityLoss() const;  // ||V^H V - I|| of the basis actually built
+    /// @brief Loss of orthogonality of the basis, ||V^H V - I||.
+    /// @return The orthogonality-loss metric.
+    Real          orthogonalityLoss() const;
 
 private:
     Matrix<T>                          basis_;
@@ -108,22 +152,44 @@ public:
         typename Target::Kind target;           // which end of the spectrum to chase
     };
 
+    /// @brief Constructs an empty solver with default options.
     ImplicitlyRestartedArnoldi();
+    /// @brief Constructs a solver with explicit options.
+    /// @param options Wanted count, subspace size, restart limit, and target.
     explicit ImplicitlyRestartedArnoldi(const Options& options);
 
+    /// @brief Runs the implicitly restarted Arnoldi iteration.
+    /// @param a The matrix.
+    /// @param startVector Initial Krylov vector.
     void compute(const Matrix<T>& a, const Vector<T>& startVector);
+    /// @brief Reports whether a result is available.
+    /// @return True if compute() has run.
     bool isComputed() const;
+    /// @brief Reports whether the wanted eigenpairs converged.
+    /// @return True on convergence.
     bool converged() const;
 
+    /// @brief The converged Ritz values (approximate eigenvalues).
+    /// @return The Ritz values.
     Vector<T> ritzValues() const;
+    /// @brief The converged Ritz vectors (approximate eigenvectors).
+    /// @return The Ritz vectors.
     Matrix<T> ritzVectors() const;
+    /// @brief Number of restarts performed.
+    /// @return The restart count.
     Index     restartsUsed() const;
 
 private:
+    /// @brief Extends the Krylov/Arnoldi factorization over a range of steps.
+    /// @param a The matrix.
+    /// @param from First step index to fill.
+    /// @param to One past the last step index to fill.
     void expandKrylovSpace(const Matrix<T>& a, Index from, Index to);
     // The implicit restart: QR steps on the projected Hessenberg with the
     // unwanted Ritz values as shifts, compressing the subspace back to
     // wantedCount vectors while keeping it a valid Arnoldi factorization.
+    /// @brief Applies a shifted-QR implicit restart to compress the subspace.
+    /// @param shifts The unwanted Ritz values used as shifts.
     void applyShiftedQRRestart(const Vector<T>& shifts);
 
     Matrix<T> basis_;

@@ -42,19 +42,45 @@ public:
         bool                  equilibrate;         // row/column scale A first (helps badly scaled systems)
     };
 
+    /// @brief Constructs a solver with default options.
     LinearSolver();
+    /// @brief Constructs a solver with explicit options.
+    /// @param options Method choice, refinement, tolerance, and scaling settings.
     explicit LinearSolver(const Options& options);
 
+    /// @brief Solves A x = b, dispatching to a suitable factorization.
+    /// @param a Coefficient matrix.
+    /// @param b Right-hand side vector.
+    /// @return The solution vector x.
     Vector<T> solve(const Matrix<T>& a, const Vector<T>& b);
+    /// @brief Solves A X = B for multiple right-hand sides.
+    /// @param a Coefficient matrix.
+    /// @param b Right-hand side matrix (one column per system).
+    /// @return The solution matrix X.
     Matrix<T> solve(const Matrix<T>& a, const Matrix<T>& b);
 
+    /// @brief Diagnostics from the most recent solve.
+    /// @return Reference to the last report.
     const Report& lastReport() const;
 
-    typename Method::Kind selectMethod(const Matrix<T>& a) const;  // the Automatic policy, exposed for tests
+    /// @brief The Automatic dispatch policy, exposed for tests.
+    /// @param a Coefficient matrix to inspect.
+    /// @return The method Automatic would pick for a.
+    typename Method::Kind selectMethod(const Matrix<T>& a) const;
+    /// @brief Polishes a solution with iterative refinement.
+    /// @param a The original coefficient matrix.
+    /// @param b The original right-hand side.
+    /// @param x The approximate solution to refine.
+    /// @param steps Number of refinement iterations.
+    /// @return The refined solution.
     Vector<T>             refine(const Matrix<T>& a, const Vector<T>& b,
                                  const Vector<T>& x, Index steps) const;
     // Scales A in place to D_r A D_c with rows/columns of comparable norm;
     // returns the scalings so the solution can be unscaled afterward.
+    /// @brief Equilibrates A in place to D_r A D_c with balanced row/column norms.
+    /// @param a Matrix scaled in place.
+    /// @param rowScale Output row scaling D_r.
+    /// @param colScale Output column scaling D_c.
     void                  equilibrate(Matrix<T>& a, Vector<T>& rowScale,
                                       Vector<T>& colScale) const;
 
