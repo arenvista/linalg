@@ -1,0 +1,7 @@
+# Style used by clang-format, which is what clangd runs when it formats a
+# document or on save. Based on LLVM so the existing layout is preserved;
+# only the indentation width is changed from two spaces to four.
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never

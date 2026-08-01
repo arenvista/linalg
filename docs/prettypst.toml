@@ -1,0 +1,51 @@
+# prettypst.toml — place in the project root (or any parent of the .typ file)
+# Use with: prettypst --use-configuration <file>
+
+indentation    = 0     # 0 = tabs, N = N spaces
+separate-label = true  # insert a space before a label: `== Heading <label>`
+final-newline  = true  # trailing newline at end of file
+
+[preserve-newline]
+content = true   # keep single newlines in markup (otherwise paragraphs get joined)
+math    = true   # keep single newlines inside equations
+
+[automatic-newline]
+max-width    = 80    # wrap when a line would exceed this; 0 disables
+in-strong    = false # allow the wrap to land inside *...*
+in-emphasis  = false # allow the wrap to land inside _..._
+
+[block]
+long-block-style = "separate"  # "separate" puts [ and ] on their own lines; "compact" doesn't
+
+[term]
+space-before = false  # `/ Term: value`
+space-after  = true
+
+[named-argument]
+space-before = false  # `f(key: value)`
+space-after  = true
+
+[dictionary-entry]
+space-before = false  # `(key: value)`
+space-after  = true
+
+[import-statement]
+space-before = false  # `#import "x": a, b`
+space-after  = true
+
+[comma]
+space-before = false  # `f(a, b)`
+space-after  = true
+
+[columns]
+comma = "end-of-content"  # or "end-of-cell" — how commas align in column-formatted calls
+
+[heading]
+blank-lines-before = 1
+blank-lines-after  = 1
+
+[columns-commands]
+grid   = "columns"  # treat these commands as tabular and align cells using
+gridx  = "columns"  # the arity given by their `columns:` named argument
+table  = "columns"
+tablex = "columns"

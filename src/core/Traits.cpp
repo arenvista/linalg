@@ -1,152 +1,147 @@
 #include "linalg/core/Traits.hpp"
 
 #include <cmath>
+#include <complex>
 #include <limits>
 
 #include "linalg/Instantiate.hpp"
-#include "linalg/core/Exceptions.hpp"
-#include "linalg/core/Matrix.hpp"
-#include "linalg/core/Vector.hpp"
 
 namespace linalg {
 
 template <typename T>
 typename NumericTraits<T>::Real NumericTraits<T>::epsilon() {
-  return std::numeric_limits<Real>::epsilon();
+    return std::numeric_limits<Real>::epsilon();
 }
 
 template <typename T>
 typename NumericTraits<T>::Real NumericTraits<T>::safeMin() {
-  // LAPACK dlamch('S'): smallest s with 1/s finite. On IEEE this reduces
-  // to min(); the guard covers formats where 1/min() would overflow.
-  const Real tiny = std::numeric_limits<Real>::min();
-  const Real small = Real(1) / std::numeric_limits<Real>::max();
-  if (small >= tiny) {
-    return small * (Real(1) + std::numeric_limits<Real>::epsilon());
-  }
-  return tiny;
+    // LAPACK dlamch('S'): smallest s with 1/s finite. On IEEE this reduces
+    // to min(); the guard covers formats where 1/min() would overflow.
+    const Real tiny = std::numeric_limits<Real>::min();
+    const Real small = Real(1) / std::numeric_limits<Real>::max();
+    if (small >= tiny) {
+        return small * (Real(1) + std::numeric_limits<Real>::epsilon());
+    }
+    return tiny;
 }
 
 template <typename T>
 typename NumericTraits<T>::Real NumericTraits<T>::abs(const Scalar &x) {
-  return std::abs(x); // NOTE: using cmath abs to avoid signed zero issues for
-                      // floating point types
+    return std::abs(x); // NOTE: using cmath abs to avoid signed zero issues for
+                        // floating point types
 }
 
 template <typename T>
 typename NumericTraits<T>::Real NumericTraits<T>::absSquared(const Scalar &x) {
-  return std::pow(x, 2);
+    return std::pow(x, 2);
 }
 
 template <typename T>
 typename NumericTraits<T>::Scalar NumericTraits<T>::conj(const Scalar &x) {
-  return x;
+    return x;
 }
 
 template <typename T>
 typename NumericTraits<T>::Real NumericTraits<T>::real(const Scalar &x) {
-  return x;
+    return x;
 }
 
 template <typename T>
-typename NumericTraits<T>::Real NumericTraits<T>::imag(const Scalar &x) {
-  throw LinalgError("not implemented: linalg::NumericTraits<T>::imag");
+typename NumericTraits<T>::Real NumericTraits<T>::imag(const Scalar &) {
+    return Real(0);
 }
 
 template <typename T>
 typename NumericTraits<T>::Scalar NumericTraits<T>::sqrt(const Scalar &x) {
-  return std::sqrt(x);
+    return std::sqrt(x);
 }
 
 template <typename T>
 typename NumericTraits<T>::Scalar NumericTraits<T>::zero() {
-  return Scalar(0);
+    return Scalar(0);
 }
 
 template <typename T>
 typename NumericTraits<T>::Scalar NumericTraits<T>::one() {
-  return Scalar(1);
+    return Scalar(1);
 }
 
 template <typename T>
 bool NumericTraits<T>::isApproxZero(const Scalar &x, Real tol) {
-  return abs(x) <= tol;
+    return abs(x) <= tol;
 }
 
+// The magnitude type is the component type T, so epsilon and safeMin are
+// exactly the real-scalar values: they characterize the underlying
+// floating-point format, not the complex number.
 template <typename T>
 typename NumericTraits<std::complex<T>>::Real
 NumericTraits<std::complex<T>>::epsilon() {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::epsilon");
+    return std::numeric_limits<Real>::epsilon();
 }
 
 template <typename T>
 typename NumericTraits<std::complex<T>>::Real
 NumericTraits<std::complex<T>>::safeMin() {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::safeMin");
+    const Real tiny = std::numeric_limits<Real>::min();
+    const Real small = Real(1) / std::numeric_limits<Real>::max();
+    if (small >= tiny) {
+        return small * (Real(1) + std::numeric_limits<Real>::epsilon());
+    }
+    return tiny;
 }
 
 template <typename T>
 typename NumericTraits<std::complex<T>>::Real
 NumericTraits<std::complex<T>>::abs(const Scalar &x) {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::abs");
+    return std::abs(x); // hypot-based, avoids overflow in re^2 + im^2
 }
 
 template <typename T>
 typename NumericTraits<std::complex<T>>::Real
 NumericTraits<std::complex<T>>::absSquared(const Scalar &x) {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::absSquared");
+    return std::norm(x); // |x|^2 = re^2 + im^2, no sqrt
 }
 
 template <typename T>
 typename NumericTraits<std::complex<T>>::Scalar
 NumericTraits<std::complex<T>>::conj(const Scalar &x) {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::conj");
+    return std::conj(x);
 }
 
 template <typename T>
 typename NumericTraits<std::complex<T>>::Real
 NumericTraits<std::complex<T>>::real(const Scalar &x) {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::real");
+    return x.real();
 }
 
 template <typename T>
 typename NumericTraits<std::complex<T>>::Real
 NumericTraits<std::complex<T>>::imag(const Scalar &x) {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::imag");
+    return x.imag();
 }
 
 template <typename T>
 typename NumericTraits<std::complex<T>>::Scalar
 NumericTraits<std::complex<T>>::sqrt(const Scalar &x) {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::sqrt");
+    return std::sqrt(x); // principal branch
 }
 
 template <typename T>
 typename NumericTraits<std::complex<T>>::Scalar
 NumericTraits<std::complex<T>>::zero() {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::zero");
+    return Scalar(0);
 }
 
 template <typename T>
 typename NumericTraits<std::complex<T>>::Scalar
 NumericTraits<std::complex<T>>::one() {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::one");
+    return Scalar(1);
 }
 
 template <typename T>
 bool NumericTraits<std::complex<T>>::isApproxZero(const Scalar &x, Real tol) {
-  throw LinalgError(
-      "not implemented: linalg::NumericTraits<std::complex<T>>::isApproxZero");
+    return abs(x) <= tol;
 }
 
 // Explicit instantiation. Every scalar the library ships is
