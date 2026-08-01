@@ -21,13 +21,22 @@ MatrixView<T>::MatrixView(T *data, Index rows, Index cols, Index rowStride,
     throw LinalgError("not implemented: linalg::MatrixView<T>::MatrixView");
 }
 
-template <typename T> MatrixView<T>::MatrixView(const MatrixView &other) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::MatrixView");
-}
+template <typename T>
+MatrixView<T>::MatrixView(const MatrixView &other)
+    : data_(other.data_), rows_(other.rows_), cols_(other.cols_),
+      rowStride_(other.rowStride_), colStride_(other.colStride_) {}
 
-template <typename T> MatrixView<T>::MatrixView(MatrixView &&other) noexcept {
-    // TODO: transfer ownership from `other`. Declared noexcept,
-    // so this stub cannot throw the way the others do.
+template <typename T>
+MatrixView<T>::MatrixView(MatrixView &&other) noexcept
+    : data_(other.data_), rows_(other.rows_), cols_(other.cols_),
+      rowStride_(other.rowStride_), colStride_(other.colStride_) {
+    // A view is non-owning, so moving is a shallow copy; clearing `other`
+    // just leaves the moved-from view empty (a valid, unspecified state).
+    other.data_ = nullptr;
+    other.rows_ = 0;
+    other.cols_ = 0;
+    other.rowStride_ = 0;
+    other.colStride_ = 0;
 }
 
 template <typename T> MatrixView<T>::~MatrixView() {}
