@@ -5,6 +5,8 @@
 #include "linalg/core/Matrix.hpp"
 #include "linalg/core/Vector.hpp"
 
+#include <algorithm> // std::swap
+
 namespace linalg {
 
 template <typename T>
@@ -39,7 +41,16 @@ template <typename T> MatrixView<T>::~MatrixView() {}
 
 template <typename T>
 MatrixView<T> &MatrixView<T>::operator=(const MatrixView &other) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::operator=");
+    // Rebinds this view to `other`'s storage (shallow: shares pointer,
+    // shape, strides). Does not copy elements; use copyFrom for that.
+    if (this != &other) {
+        data_ = other.data_;
+        rows_ = other.rows_;
+        cols_ = other.cols_;
+        rowStride_ = other.rowStride_;
+        colStride_ = other.colStride_;
+    }
+    return *this;
 }
 
 template <typename T>
@@ -177,7 +188,15 @@ template <typename T> MatrixView<T> MatrixView<T>::transposed() {
 }
 
 template <typename T> Matrix<T> MatrixView<T>::toMatrix() const {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::toMatrix");
+    // Deep copy into fresh contiguous storage; the result does not alias
+    // this view and is unaffected by later writes through it.
+    Matrix<T> result(rows_, cols_);
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            result(i, j) = data_[i * rowStride_ + j * colStride_];
+        }
+    }
+    return result;
 }
 
 template <typename T> void MatrixView<T>::fill(const T &value) {
@@ -199,102 +218,141 @@ template <typename T> void MatrixView<T>::scale(const T &factor) {
 }
 
 template <typename T> void MatrixView<T>::swapWith(MatrixView &other) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::swapWith");
+    if (rows_ != other.rows() || cols_ != other.cols()) {
+        throw DimensionMismatch(rows_, cols_, other.rows(), other.cols());
+    }
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            std::swap(
+                data_[i * rowStride_ + j * colStride_],
+                other.data_[i * other.rowStride() + j * other.colStride()]);
+        }
+    }
 }
 
 template <typename T> void MatrixView<T>::copyFrom(const MatrixView &source) {
-    throw LinalgError("not implemented: linalg::MatrixView<T>::copyFrom");
+    if (this == &source) {
+        return; // no-op if the source is this view itself
+    }
+    if (rows_ != source.rows() || cols_ != source.cols()) {
+        throw DimensionMismatch(rows_, cols_, source.rows(), source.cols());
+    }
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            data_[i * rowStride_ + j * colStride_] =
+                source.data_[i * source.rowStride() + j * source.colStride()];
+        }
+    }
 }
 
-template <typename T> ConstMatrixView<T>::ConstMatrixView() {
-    throw LinalgError(
-        "not implemented: linalg::ConstMatrixView<T>::ConstMatrixView");
-}
+template <typename T>
+ConstMatrixView<T>::ConstMatrixView()
+    : data_(nullptr), rows_(0), cols_(0), rowStride_(0), colStride_(0) {}
 
 template <typename T>
 ConstMatrixView<T>::ConstMatrixView(const T *data, Index rows, Index cols,
-                                    Index rowStride, Index colStride) {
-    throw LinalgError(
-        "not implemented: linalg::ConstMatrixView<T>::ConstMatrixView");
-}
+                                    Index rowStride, Index colStride)
+    : data_(data), rows_(rows), cols_(cols), rowStride_(rowStride),
+      colStride_(colStride) {}
 
 template <typename T>
-ConstMatrixView<T>::ConstMatrixView(const MatrixView<T> &view) {
-    throw LinalgError(
-        "not implemented: linalg::ConstMatrixView<T>::ConstMatrixView");
-}
+ConstMatrixView<T>::ConstMatrixView(const MatrixView<T> &view)
+    : data_(view.data()), rows_(view.rows()), cols_(view.cols()),
+      rowStride_(view.rowStride()), colStride_(view.colStride()) {}
 
 template <typename T>
 const T &ConstMatrixView<T>::operator()(Index i, Index j) const {
-    throw LinalgError(
-        "not implemented: linalg::ConstMatrixView<T>::operator()");
+    return data_[i * rowStride_ + j * colStride_];
 }
 
 template <typename T> const T &ConstMatrixView<T>::at(Index i, Index j) const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::at");
+    if (i >= rows_) {
+        throw IndexOutOfRange(i, rows_);
+    }
+    if (j >= cols_) {
+        throw IndexOutOfRange(j, cols_);
+    }
+    return data_[i * rowStride_ + j * colStride_];
 }
 
 template <typename T>
 typename ConstMatrixView<T>::Index ConstMatrixView<T>::rows() const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::rows");
+    return rows_;
 }
 
 template <typename T>
 typename ConstMatrixView<T>::Index ConstMatrixView<T>::cols() const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::cols");
+    return cols_;
 }
 
 template <typename T>
 typename ConstMatrixView<T>::Index ConstMatrixView<T>::rowStride() const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::rowStride");
+    return rowStride_;
 }
 
 template <typename T>
 typename ConstMatrixView<T>::Index ConstMatrixView<T>::colStride() const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::colStride");
+    return colStride_;
 }
 
 template <typename T> bool ConstMatrixView<T>::isContiguous() const {
-    throw LinalgError(
-        "not implemented: linalg::ConstMatrixView<T>::isContiguous");
+    return (rowStride_ == cols_ && colStride_ == 1);
 }
 
 template <typename T> bool ConstMatrixView<T>::isEmpty() const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::isEmpty");
+    return (rows_ == 0 || cols_ == 0);
 }
 
 template <typename T> const T *ConstMatrixView<T>::data() const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::data");
+    return data_;
 }
 
 template <typename T>
 ConstMatrixView<T> ConstMatrixView<T>::block(Index i, Index j, Index numRows,
                                              Index numCols) const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::block");
+    // Read-only sub-view over the same storage; see MatrixView::block.
+    if (i > rows_ || numRows > rows_ - i) {
+        throw IndexOutOfRange(i + numRows, rows_);
+    }
+    if (j > cols_ || numCols > cols_ - j) {
+        throw IndexOutOfRange(j + numCols, cols_);
+    }
+    return ConstMatrixView(data_ + i * rowStride_ + j * colStride_, numRows,
+                           numCols, rowStride_, colStride_);
 }
 
 template <typename T>
 ConstMatrixView<T> ConstMatrixView<T>::row(Index i) const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::row");
+    return block(i, 0, 1, cols_); // a 1 x cols_ view
 }
 
 template <typename T>
 ConstMatrixView<T> ConstMatrixView<T>::col(Index j) const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::col");
+    return block(0, j, rows_, 1); // a rows_ x 1 view
 }
 
 template <typename T> ConstMatrixView<T> ConstMatrixView<T>::diagonal() const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::diagonal");
+    // 1 x min(rows, cols) view along the main diagonal; see MatrixView.
+    const Index n = rows_ < cols_ ? rows_ : cols_;
+    return ConstMatrixView(data_, 1, n, rowStride_ + colStride_,
+                           rowStride_ + colStride_);
 }
 
 template <typename T>
 ConstMatrixView<T> ConstMatrixView<T>::transposed() const {
-    throw LinalgError(
-        "not implemented: linalg::ConstMatrixView<T>::transposed");
+    // Swap the row and column counts and strides, but keep the same base.
+    return ConstMatrixView(data_, cols_, rows_, colStride_, rowStride_);
 }
 
 template <typename T> Matrix<T> ConstMatrixView<T>::toMatrix() const {
-    throw LinalgError("not implemented: linalg::ConstMatrixView<T>::toMatrix");
+    // Deep copy into fresh contiguous storage.
+    Matrix<T> result(rows_, cols_);
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            result(i, j) = data_[i * rowStride_ + j * colStride_];
+        }
+    }
+    return result;
 }
 
 // Explicit instantiation. Every scalar the library ships is
