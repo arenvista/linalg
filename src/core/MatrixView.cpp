@@ -30,9 +30,9 @@ MatrixView<T>::MatrixView(MatrixView &&other) noexcept
       rowStride_(other.rowStride_), colStride_(other.colStride_) {
     // A view is non-owning, so moving is a shallow copy; clearing `other`
     // just leaves the moved-from view empty (a valid, unspecified state).
-    other.data_ = nullptr;
-    other.rows_ = 0;
-    other.cols_ = 0;
+    other.data_      = nullptr;
+    other.rows_      = 0;
+    other.cols_      = 0;
     other.rowStride_ = 0;
     other.colStride_ = 0;
 }
@@ -44,9 +44,9 @@ MatrixView<T> &MatrixView<T>::operator=(const MatrixView &other) {
     // Rebinds this view to `other`'s storage (shallow: shares pointer,
     // shape, strides). Does not copy elements; use copyFrom for that.
     if (this != &other) {
-        data_ = other.data_;
-        rows_ = other.rows_;
-        cols_ = other.cols_;
+        data_      = other.data_;
+        rows_      = other.rows_;
+        cols_      = other.cols_;
         rowStride_ = other.rowStride_;
         colStride_ = other.colStride_;
     }
@@ -59,14 +59,14 @@ MatrixView<T> &MatrixView<T>::operator=(MatrixView &&other) noexcept {
     // non-owning, so there is nothing to free). Guard against self-move,
     // then clear `other` to leave it empty.
     if (this != &other) {
-        data_ = other.data_;
-        rows_ = other.rows_;
-        cols_ = other.cols_;
-        rowStride_ = other.rowStride_;
-        colStride_ = other.colStride_;
-        other.data_ = nullptr;
-        other.rows_ = 0;
-        other.cols_ = 0;
+        data_            = other.data_;
+        rows_            = other.rows_;
+        cols_            = other.cols_;
+        rowStride_       = other.rowStride_;
+        colStride_       = other.colStride_;
+        other.data_      = nullptr;
+        other.rows_      = 0;
+        other.cols_      = 0;
         other.rowStride_ = 0;
         other.colStride_ = 0;
     }
@@ -357,8 +357,8 @@ template <typename T> Matrix<T> ConstMatrixView<T>::toMatrix() const {
 
 // Explicit instantiation. Every scalar the library ships is
 // compiled here once, rather than in each including translation unit.
-#define LINALG_INSTANTIATE(SCALAR)                                             \
-    template class MatrixView<SCALAR>;                                         \
+#define LINALG_INSTANTIATE(SCALAR)     \
+    template class MatrixView<SCALAR>; \
     template class ConstMatrixView<SCALAR>;
 
 LINALG_FOR_EACH_SCALAR(LINALG_INSTANTIATE)

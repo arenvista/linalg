@@ -1,7 +1,54 @@
 # Style used by clang-format, which is what clangd runs when it formats a
 # document or on save. Based on LLVM so the existing layout is preserved;
-# only the indentation width is changed from two spaces to four.
+# the indentation width is widened to four spaces and a handful of LLVM
+# defaults are pinned explicitly so formatting stays stable across
+# clang-format versions and reads as a deliberate choice rather than an
+# inherited one. Every option below either matches the current LLVM default
+# or is one this codebase already follows, so adopting it reformats nothing.
+Language: Cpp
 BasedOnStyle: LLVM
+
+# The library targets C++17 (see target_compile_features in CMakeLists.txt).
+# Telling clang-format the language level makes it parse constructs such as
+# nested `>>` in templates and `if constexpr` the way the compiler does.
+Standard: c++17
+
+# Indentation: four spaces, never tabs. This is the one place the layout
+# departs from stock LLVM (which uses two).
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
+ContinuationIndentWidth: 4
+
+# Line width. 80 is the LLVM default; pinned so it is never inherited
+# silently or changed out from under the sources.
+ColumnLimit: 80
+
+# Pointers and references bind to the name, matching `T *data` and
+# `const MatrixView &other` throughout the sources.
+PointerAlignment: Right
+ReferenceAlignment: Pointer
+
+# Break `template <...>` onto its own line only when the entity it introduces
+# spans multiple lines, so `template <typename T> class Matrix;` forward
+# declarations stay on one line while function and class definitions break.
+AlwaysBreakTemplateDeclarations: MultiLine
+SpaceAfterTemplateKeyword: true
+
+# Includes are sorted within each block, but existing blank-line-separated
+# groups are kept as written (own header / project / <system>, and the
+# subsystem groupings in the linalg.hpp umbrella header). Preserve avoids
+# collapsing those intentional groups into one flat list.
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+
+
+AlignConsecutiveAssignments: true
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AlignConsecutiveMacros: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveTableGenDefinitionColons: Consecutive
+AlignEscapedNewlines: Left
+AlignOperands: true
+AlignTrailingComments: true
+
