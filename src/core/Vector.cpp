@@ -517,6 +517,7 @@ template <typename T> T Vector<T>::maxCoefficient() const {
     for (std::size_t i = 1; i < storage_.size(); i++) {
         if (NumericTraits<T>::real(storage_[i]) >
             NumericTraits<T>::real(maxValue)) {
+<<<<<<< HEAD
             maxValue             = storage_[i];
             T           maxValue = storage_[0];
             std::size_t maxIndex = 0;
@@ -528,6 +529,8 @@ template <typename T> T Vector<T>::maxCoefficient() const {
                 }
             }
             return maxValue;
+=======
+>>>>>>> b33698b (added isApprox)
         }
     }
 }
