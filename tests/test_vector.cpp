@@ -26,15 +26,15 @@ using C = std::complex<double>;
 namespace {
 
 // Runs `expr`; asserts it throws a linalg::LinalgError (covers all subclasses).
-#define EXPECT_LINALG_THROW(expr)                                              \
-    do {                                                                       \
-        bool threw = false;                                                    \
-        try {                                                                  \
-            (void)(expr);                                                      \
-        } catch (const LinalgError &) {                                        \
-            threw = true;                                                      \
-        }                                                                      \
-        assert(threw && "expected LinalgError: " #expr);                       \
+#define EXPECT_LINALG_THROW(expr)                        \
+    do {                                                 \
+        bool threw = false;                              \
+        try {                                            \
+            (void)(expr);                                \
+        } catch (const LinalgError &) {                  \
+            threw = true;                                \
+        }                                                \
+        assert(threw && "expected LinalgError: " #expr); \
     } while (0)
 
 void test_constructors_and_assignment() {
@@ -62,7 +62,7 @@ void test_constructors_and_assignment() {
     assert(massign == a);
 
     std::vector<double> raw{5.0, 6.0};
-    Vector<double> fromStd(raw);
+    Vector<double>      fromStd(raw);
     assert(fromStd.size() == 2 && fromStd(1) == 6.0);
 }
 
@@ -97,7 +97,7 @@ void test_access_bounds() {
 
     // data() is contiguous and writes through
     double *p = v.data();
-    p[0] = -1.0;
+    p[0]      = -1.0;
     assert(v(0) == -1.0);
 
     // at() is bounds-checked with the library's own exception type
@@ -129,7 +129,7 @@ void test_arithmetic() {
     EXPECT_LINALG_THROW(a - shorter);
 
     // compound assignment returns *this and mutates in place
-    Vector<double> c = a;
+    Vector<double>  c   = a;
     Vector<double> &ref = (c += b);
     assert(&ref == &c && c == Vector<double>({5.0, 7.0, 9.0}));
     c -= b;
@@ -144,7 +144,7 @@ void test_arithmetic() {
 void test_products() {
     Vector<double> a{1.0, 2.0, 3.0};
     Vector<double> b{4.0, 5.0, 6.0};
-    assert(a.dot(b) == 32.0);        // 4 + 10 + 18
+    assert(a.dot(b) == 32.0);          // 4 + 10 + 18
     assert(a.hermitianDot(b) == 32.0); // real: same as dot
 
     // hermitianDot conjugates the left argument
@@ -218,15 +218,16 @@ void test_predicates_and_misc() {
     Vector<double> b{1.0 + 1e-10, 2.0 - 1e-10, 3.0};
     assert(a.isApprox(b, 1e-9));
     assert(!a.isApprox(b, 1e-12));
-    assert(!a.isApprox(Vector<double>({1.0, 2.0}), 1e9)); // size mismatch -> false
+    assert(
+        !a.isApprox(Vector<double>({1.0, 2.0}), 1e9)); // size mismatch -> false
 
     // hasNaN
     const double nan = std::numeric_limits<double>::quiet_NaN();
     const double inf = std::numeric_limits<double>::infinity();
     assert(!a.hasNaN());
     assert(Vector<double>({1.0, nan, 3.0}).hasNaN());
-    assert(!Vector<double>({inf}).hasNaN());       // inf is not NaN
-    assert(Vector<C>({C(1, nan)}).hasNaN());        // NaN in imaginary part
+    assert(!Vector<double>({inf}).hasNaN()); // inf is not NaN
+    assert(Vector<C>({C(1, nan)}).hasNaN()); // NaN in imaginary part
 
     // resize discards contents and zero-fills
     Vector<double> r{1.0, 2.0, 3.0};
@@ -244,9 +245,6 @@ void test_predicates_and_misc() {
     assert(Vector<double>().toString(3) == "[]");
     assert(Vector<double>({1.0}).toString(3) == "[1]");
 }
-
-// The stragglers: everything below needs Matrix (or is still a stub), so it
-// runs through the skip harness instead of aborting the whole binary.
 
 void test_conservative_resize() {
     Vector<double> v{1.0, 2.0, 3.0};
