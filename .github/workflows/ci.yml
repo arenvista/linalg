@@ -1,0 +1,50 @@
+# Build the library and run the full ctest suite on every pull request
+# (and on pushes to main, so the baseline stays green).
+#
+# Skipped tests (exit code 77 via SKIP_RETURN_CODE — suites whose methods
+# are still "not implemented" stubs) count as success; only real failures
+# fail the job. Make this check required in the repository's branch
+# protection settings so PRs cannot merge until it passes.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: build & ctest (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # RelWithDebInfo/Release define NDEBUG, which would compile out the
+      # assert() calls the test suite fails through — the tests would pass
+      # vacuously. Debug keeps the asserts live.
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DLINALG_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --parallel 2

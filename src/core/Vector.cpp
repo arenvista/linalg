@@ -5,9 +5,14 @@
 #include "linalg/core/Matrix.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
+#include <iomanip>
+#include <numeric>
 #include <random>
+#include <sstream>
 #include <utility>
+#include <vector>
 
 namespace linalg {
 
@@ -278,6 +283,7 @@ template <typename T> T Vector<T>::dot(const Vector &rhs) const {
     for (Index i = 0; i < size(); ++i) {
         sum += (*this)(i)*rhs(i);
     }
+    return sum;
 }
 
 template <typename T> T Vector<T>::hermitianDot(const Vector &rhs) const {
@@ -292,91 +298,161 @@ template <typename T> T Vector<T>::hermitianDot(const Vector &rhs) const {
 }
 
 template <typename T> Matrix<T> Vector<T>::outer(const Vector &rhs) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::outer");
+    Matrix<T> result(size(), rhs.size());
+    for (Index i = 0; i < size(); ++i) {
+        for (Index j = 0; j < rhs.size(); ++j) {
+            result(i, j) = (*this)(i)*NumericTraits<T>::conj(rhs(j));
+        }
+    }
+    return result;
 }
 
 template <typename T> Vector<T> Vector<T>::cross(const Vector &rhs) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::cross");
+    if (size() != 3 || rhs.size() != 3) {
+        throw DimensionMismatch(size(), 1, rhs.size(), 1);
+    }
+    Vector result(3);
+    result(0) = (*this)(1) * rhs(2) - (*this)(2) * rhs(1);
+    result(1) = (*this)(2) * rhs(0) - (*this)(0) * rhs(2);
+    result(2) = (*this)(0) * rhs(1) - (*this)(1) * rhs(0);
+    return result;
 }
 
 template <typename T>
 Vector<T> Vector<T>::axpy(const T      &alpha,
                           const Vector &y) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::axpy");
+    if (size() != y.size()) {
+        throw DimensionMismatch(size(), 1, y.size(), 1);
+    }
+    Vector result(size());
+    for (Index i = 0; i < size(); ++i) {
+        result(i) = alpha * (*this)(i) + y(i);
+    }
+    return result;
 }
 
 template <typename T> typename Vector<T>::Real Vector<T>::norm() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::norm");
+    // Overflow-safe scaling: factor out the running maximum magnitude so
+    // |x_i|^2 is never formed directly. Mirrors BLAS nrm2.
+    Real scale = Real{};
+    Real ssq   = Real(1);
+    for (Index i = 0; i < size(); ++i) {
+        const Real ax = NumericTraits<T>::abs((*this)(i));
+        if (ax != Real{}) {
+            if (scale < ax) {
+                const Real r = scale / ax;
+                ssq          = Real(1) + ssq * r * r;
+                scale        = ax;
+            } else {
+                const Real r = ax / scale;
+                ssq += r * r;
+            }
+        }
+    }
+    return scale * NumericTraits<Real>::sqrt(ssq);
 }
 
 template <typename T> typename Vector<T>::Real Vector<T>::squaredNorm() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::squaredNorm");
+    Real sumSq = Real{};
+    for (Index i = 0; i < size(); ++i) {
+        sumSq += NumericTraits<T>::absSquared((*this)(i));
+    }
+    return sumSq;
 }
 
 template <typename T> typename Vector<T>::Real Vector<T>::oneNorm() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::oneNorm");
+    Real sum = Real{};
+    for (Index i = 0; i < size(); ++i) {
+        sum += NumericTraits<T>::abs((*this)(i));
+    }
+    return sum;
 }
 
 template <typename T> typename Vector<T>::Real Vector<T>::infinityNorm() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::infinityNorm");
+    Real maxMag = Real{};
+    for (Index i = 0; i < size(); ++i) {
+        const Real ax = NumericTraits<T>::abs((*this)(i));
+        if (ax > maxMag) {
+            maxMag = ax;
+        }
+    }
+    return maxMag;
 }
 
 template <typename T> typename Vector<T>::Real Vector<T>::pNorm(Real p) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::pNorm");
+    Real sum = Real{};
+    for (Index i = 0; i < size(); ++i) {
+        sum += std::pow(NumericTraits<T>::abs((*this)(i)), p);
+    }
+    return std::pow(sum, Real(1) / p);
 }
 
 template <typename T> T Vector<T>::sum() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::sum");
+    return std::accumulate(storage_.begin(), storage_.end(), T{});
 }
 
 template <typename T> T Vector<T>::product() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::product");
+    return std::accumulate(storage_.begin(), storage_.end(), T{1},
+                           std::multiplies<T>());
 }
 
 template <typename T> Vector<T> Vector<T>::normalized() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::normalized");
+    return (*this) / T(norm());
 }
 
 template <typename T> void Vector<T>::normalize() {
-    throw LinalgError("not implemented: linalg::Vector<T>::normalize");
+    const Real n = norm();
+    if (n == Real{}) {
+        throw LinalgError("cannot normalize zero vector");
+    }
+    (*this) /= T(n);
 }
 
 template <typename T>
 Vector<T> Vector<T>::segment(Index start,
                              Index count) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::segment");
+    return Vector(std::vector<T>(storage_.begin() + start,
+                                 storage_.begin() + start + count));
 }
 
 template <typename T> Vector<T> Vector<T>::head(Index count) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::head");
+    return Vector(std::vector<T>(storage_.begin(), storage_.begin() + count));
 }
 
 template <typename T> Vector<T> Vector<T>::tail(Index count) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::tail");
+    return Vector(std::vector<T>(storage_.end() - count, storage_.end()));
 }
 
 template <typename T> Vector<T> Vector<T>::concat(const Vector &rhs) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::concat");
+    std::vector<T> result = std::vector<T>(storage_.begin(), storage_.end());
+    result.reserve(size() + rhs.size());
+    result.insert(result.end(), rhs.storage_.begin(), rhs.storage_.end());
+    return Vector(result);
 }
 
 template <typename T> Vector<T> Vector<T>::reversed() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::reversed");
+    return Vector(std::vector<T>(storage_.rbegin(), storage_.rend()));
 }
 
 template <typename T> Matrix<T> Vector<T>::asColumnMatrix() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::asColumnMatrix");
+    return Matrix<T>(size(), 1, storage_);
 }
 
 template <typename T> Matrix<T> Vector<T>::asRowMatrix() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::asRowMatrix");
+    return Matrix<T>(1, size(), storage_);
 }
 
 template <typename T> Matrix<T> Vector<T>::asDiagonalMatrix() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::asDiagonalMatrix");
+    Matrix<T> result(size(), size(), T{});
+    for (Index i = 0; i < size(); ++i) {
+        result(i, i) = (*this)(i);
+    }
+    return result;
 }
 
 template <typename T> void Vector<T>::resize(Index size) {
-    throw LinalgError("not implemented: linalg::Vector<T>::resize");
+    // Contract: discard all existing contents; zero-fill the new length.
+    storage_.assign(size, T{});
 }
 
 template <typename T> void Vector<T>::conservativeResize(Index size) {
@@ -384,49 +460,124 @@ template <typename T> void Vector<T>::conservativeResize(Index size) {
 }
 
 template <typename T> void Vector<T>::fill(const T &value) {
-    throw LinalgError("not implemented: linalg::Vector<T>::fill");
+    std::fill(storage_.begin(), storage_.end(), value);
 }
 
 template <typename T> void Vector<T>::setZero() {
-    throw LinalgError("not implemented: linalg::Vector<T>::setZero");
+    std::fill(storage_.begin(), storage_.end(), T{});
 }
 
 template <typename T> void Vector<T>::setUnit(Index axis) {
-    throw LinalgError("not implemented: linalg::Vector<T>::setUnit");
+    setZero(), storage_[axis] = T(1);
 }
 
 template <typename T> void Vector<T>::swap(Vector &other) {
-    throw LinalgError("not implemented: linalg::Vector<T>::swap");
+    storage_.swap(other.storage_);
 }
 
 template <typename T> typename Vector<T>::Index Vector<T>::maxAbsIndex() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::maxAbsIndex");
+    if (storage_.empty()) {
+        throw LinalgError("linalg::Vector<T>::maxAbsIndex on empty vector");
+    }
+    T           maxValue = storage_[0];
+    std::size_t maxIndex = 0;
+    for (std::size_t i = 1; i < storage_.size(); i++) {
+        if (NumericTraits<T>::abs(storage_[i]) >
+            NumericTraits<T>::abs(maxValue)) {
+            maxValue = storage_[i];
+            maxIndex = i;
+        }
+    }
+    return maxIndex;
 }
 
 template <typename T> typename Vector<T>::Index Vector<T>::minAbsIndex() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::minAbsIndex");
+    if (storage_.empty()) {
+        throw LinalgError("linalg::Vector<T>::minAbsIndex on empty vector");
+    }
+    T           minValue = storage_[0];
+    std::size_t minIndex = 0;
+    for (std::size_t i = 1; i < storage_.size(); i++) {
+        if (NumericTraits<T>::abs(storage_[i]) <
+            NumericTraits<T>::abs(minValue)) {
+            minValue = storage_[i];
+            minIndex = i;
+        }
+    }
+    return minIndex;
 }
 
 template <typename T> T Vector<T>::maxCoefficient() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::maxCoefficient");
+    if (storage_.empty()) {
+        throw LinalgError("linalg::Vector<T>::maxCoefficient on empty vector");
+    }
+    // Contract: compare by real part (== value for real T); ties keep lowest
+    // index.
+    T maxValue = storage_[0];
+    for (std::size_t i = 1; i < storage_.size(); i++) {
+        if (NumericTraits<T>::real(storage_[i]) >
+            NumericTraits<T>::real(maxValue)) {
+            maxValue = storage_[i];
+        }
+    }
+    return maxValue;
 }
 
 template <typename T> T Vector<T>::minCoefficient() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::minCoefficient");
+    if (storage_.empty()) {
+        throw LinalgError("linalg::Vector<T>::minCoefficient on empty vector");
+    }
+    // Contract: compare by real part (== value for real T); ties keep lowest
+    // index.
+    T minValue = storage_[0];
+    for (std::size_t i = 1; i < storage_.size(); i++) {
+        if (NumericTraits<T>::real(storage_[i]) <
+            NumericTraits<T>::real(minValue)) {
+            minValue = storage_[i];
+        }
+    }
+    return minValue;
 }
 
 template <typename T>
 bool Vector<T>::isApprox(const Vector &other,
                          Real          tolerance) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::isApprox");
+    if (size() != other.size()) {
+        return false;
+    }
+    for (Index i = 0; i < size(); ++i) {
+        // isApproxZero(x, tol) is |x| <= tol; works for complex T too.
+        if (!NumericTraits<T>::isApproxZero((*this)(i)-other(i), tolerance)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 template <typename T> bool Vector<T>::hasNaN() const {
-    throw LinalgError("not implemented: linalg::Vector<T>::hasNaN");
+    for (const auto &value : storage_) {
+        // Covers complex T too: imag() is 0 for real T, so one path serves
+        // both.
+        if (std::isnan(NumericTraits<T>::real(value)) ||
+            std::isnan(NumericTraits<T>::imag(value))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 template <typename T> std::string Vector<T>::toString(int precision) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::toString");
+    std::ostringstream oss;
+    oss << std::setprecision(precision);
+    oss << "[";
+    for (Index i = 0; i < size(); ++i) {
+        if (i > 0) {
+            oss << ", ";
+        }
+        oss << (*this)(i); // std::complex has its own operator<<, so both work
+    }
+    oss << "]";
+    return oss.str();
 }
 
 template <typename T> void Vector<T>::checkBounds(Index i) const {
@@ -436,7 +587,9 @@ template <typename T> void Vector<T>::checkBounds(Index i) const {
 }
 
 template <typename T> void Vector<T>::checkSameSize(const Vector &other) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::checkSameSize");
+    if (size() != other.size()) {
+        throw DimensionMismatch(size(), 1, other.size(), 1);
+    }
 }
 
 // Explicit instantiation. Every scalar the library ships is
