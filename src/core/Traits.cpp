@@ -17,7 +17,7 @@ template <typename T>
 typename NumericTraits<T>::Real NumericTraits<T>::safeMin() {
     // LAPACK dlamch('S'): smallest s with 1/s finite. On IEEE this reduces
     // to min(); the guard covers formats where 1/min() would overflow.
-    const Real tiny = std::numeric_limits<Real>::min();
+    const Real tiny  = std::numeric_limits<Real>::min();
     const Real small = Real(1) / std::numeric_limits<Real>::max();
     if (small >= tiny) {
         return small * (Real(1) + std::numeric_limits<Real>::epsilon());
@@ -67,7 +67,8 @@ typename NumericTraits<T>::Scalar NumericTraits<T>::one() {
 }
 
 template <typename T>
-bool NumericTraits<T>::isApproxZero(const Scalar &x, Real tol) {
+bool NumericTraits<T>::isApproxZero(const Scalar &x,
+                                    Real          tol) {
     return abs(x) <= tol;
 }
 
@@ -83,7 +84,7 @@ NumericTraits<std::complex<T>>::epsilon() {
 template <typename T>
 typename NumericTraits<std::complex<T>>::Real
 NumericTraits<std::complex<T>>::safeMin() {
-    const Real tiny = std::numeric_limits<Real>::min();
+    const Real tiny  = std::numeric_limits<Real>::min();
     const Real small = Real(1) / std::numeric_limits<Real>::max();
     if (small >= tiny) {
         return small * (Real(1) + std::numeric_limits<Real>::epsilon());
@@ -140,7 +141,8 @@ NumericTraits<std::complex<T>>::one() {
 }
 
 template <typename T>
-bool NumericTraits<std::complex<T>>::isApproxZero(const Scalar &x, Real tol) {
+bool NumericTraits<std::complex<T>>::isApproxZero(const Scalar &x,
+                                                  Real          tol) {
     return abs(x) <= tol;
 }
 

@@ -11,23 +11,39 @@ namespace linalg {
 
 template <typename T>
 MatrixView<T>::MatrixView()
-    : data_(nullptr), rows_(0), cols_(0), rowStride_(0), colStride_(0) {}
+    : data_(nullptr),
+      rows_(0),
+      cols_(0),
+      rowStride_(0),
+      colStride_(0) {}
 
 template <typename T>
-MatrixView<T>::MatrixView(T *data, Index rows, Index cols, Index rowStride,
+MatrixView<T>::MatrixView(T    *data,
+                          Index rows,
+                          Index cols,
+                          Index rowStride,
                           Index colStride)
-    : data_(data), rows_(rows), cols_(cols), rowStride_(rowStride),
+    : data_(data),
+      rows_(rows),
+      cols_(cols),
+      rowStride_(rowStride),
       colStride_(colStride) {}
 
 template <typename T>
 MatrixView<T>::MatrixView(const MatrixView &other)
-    : data_(other.data_), rows_(other.rows_), cols_(other.cols_),
-      rowStride_(other.rowStride_), colStride_(other.colStride_) {}
+    : data_(other.data_),
+      rows_(other.rows_),
+      cols_(other.cols_),
+      rowStride_(other.rowStride_),
+      colStride_(other.colStride_) {}
 
 template <typename T>
 MatrixView<T>::MatrixView(MatrixView &&other) noexcept
-    : data_(other.data_), rows_(other.rows_), cols_(other.cols_),
-      rowStride_(other.rowStride_), colStride_(other.colStride_) {
+    : data_(other.data_),
+      rows_(other.rows_),
+      cols_(other.cols_),
+      rowStride_(other.rowStride_),
+      colStride_(other.colStride_) {
     // A view is non-owning, so moving is a shallow copy; clearing `other`
     // just leaves the moved-from view empty (a valid, unspecified state).
     other.data_      = nullptr;
@@ -88,16 +104,21 @@ MatrixView<T> &MatrixView<T>::operator=(const Matrix<T> &source) {
     return *this;
 }
 
-template <typename T> T &MatrixView<T>::operator()(Index i, Index j) {
+template <typename T>
+T &MatrixView<T>::operator()(Index i,
+                             Index j) {
     return data_[i * rowStride_ + j * colStride_];
 }
 
 template <typename T>
-const T &MatrixView<T>::operator()(Index i, Index j) const {
+const T &MatrixView<T>::operator()(Index i,
+                                   Index j) const {
     return data_[i * rowStride_ + j * colStride_];
 }
 
-template <typename T> T &MatrixView<T>::at(Index i, Index j) {
+template <typename T>
+T &MatrixView<T>::at(Index i,
+                     Index j) {
     if (i >= rows_) {
         throw IndexOutOfRange(i, rows_);
     }
@@ -107,7 +128,9 @@ template <typename T> T &MatrixView<T>::at(Index i, Index j) {
     return data_[i * rowStride_ + j * colStride_];
 }
 
-template <typename T> const T &MatrixView<T>::at(Index i, Index j) const {
+template <typename T>
+const T &MatrixView<T>::at(Index i,
+                           Index j) const {
     if (i >= rows_) {
         throw IndexOutOfRange(i, rows_);
     }
@@ -150,7 +173,9 @@ template <typename T> T *MatrixView<T>::data() { return data_; }
 template <typename T> const T *MatrixView<T>::data() const { return data_; }
 
 template <typename T>
-MatrixView<T> MatrixView<T>::block(Index i, Index j, Index numRows,
+MatrixView<T> MatrixView<T>::block(Index i,
+                                   Index j,
+                                   Index numRows,
                                    Index numCols) {
     // Sub-view over the same storage: rebase the pointer to element (i, j)
     // and keep the strides, so the block sees the same layout. The block
@@ -247,25 +272,41 @@ template <typename T> void MatrixView<T>::copyFrom(const MatrixView &source) {
 
 template <typename T>
 ConstMatrixView<T>::ConstMatrixView()
-    : data_(nullptr), rows_(0), cols_(0), rowStride_(0), colStride_(0) {}
+    : data_(nullptr),
+      rows_(0),
+      cols_(0),
+      rowStride_(0),
+      colStride_(0) {}
 
 template <typename T>
-ConstMatrixView<T>::ConstMatrixView(const T *data, Index rows, Index cols,
-                                    Index rowStride, Index colStride)
-    : data_(data), rows_(rows), cols_(cols), rowStride_(rowStride),
+ConstMatrixView<T>::ConstMatrixView(const T *data,
+                                    Index    rows,
+                                    Index    cols,
+                                    Index    rowStride,
+                                    Index    colStride)
+    : data_(data),
+      rows_(rows),
+      cols_(cols),
+      rowStride_(rowStride),
       colStride_(colStride) {}
 
 template <typename T>
 ConstMatrixView<T>::ConstMatrixView(const MatrixView<T> &view)
-    : data_(view.data()), rows_(view.rows()), cols_(view.cols()),
-      rowStride_(view.rowStride()), colStride_(view.colStride()) {}
+    : data_(view.data()),
+      rows_(view.rows()),
+      cols_(view.cols()),
+      rowStride_(view.rowStride()),
+      colStride_(view.colStride()) {}
 
 template <typename T>
-const T &ConstMatrixView<T>::operator()(Index i, Index j) const {
+const T &ConstMatrixView<T>::operator()(Index i,
+                                        Index j) const {
     return data_[i * rowStride_ + j * colStride_];
 }
 
-template <typename T> const T &ConstMatrixView<T>::at(Index i, Index j) const {
+template <typename T>
+const T &ConstMatrixView<T>::at(Index i,
+                                Index j) const {
     if (i >= rows_) {
         throw IndexOutOfRange(i, rows_);
     }
@@ -308,7 +349,9 @@ template <typename T> const T *ConstMatrixView<T>::data() const {
 }
 
 template <typename T>
-ConstMatrixView<T> ConstMatrixView<T>::block(Index i, Index j, Index numRows,
+ConstMatrixView<T> ConstMatrixView<T>::block(Index i,
+                                             Index j,
+                                             Index numRows,
                                              Index numCols) const {
     // Read-only sub-view over the same storage; see MatrixView::block.
     if (i > rows_ || numRows > rows_ - i) {

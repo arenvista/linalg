@@ -47,7 +47,7 @@ NotPositiveDefinite::NotPositiveDefinite(std::size_t pivotIndex)
 std::size_t NotPositiveDefinite::pivotIndex() const { return pivotIndex_; }
 
 ConvergenceFailure::ConvergenceFailure(const std::string &algorithm,
-                                       std::size_t iterations)
+                                       std::size_t        iterations)
     : LinalgError(algorithm + " failed to converge in " +
                   std::to_string(iterations) + " iterations"),
       algorithm_(algorithm), iterations_(iterations) {}

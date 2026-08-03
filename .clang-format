@@ -52,3 +52,9 @@ AlignEscapedNewlines: Left
 AlignOperands: true
 AlignTrailingComments: true
 
+# Put each function parameter and each constructor initializer on its own
+# line (rather than bin-packing several per line). Combined with
+# AlignConsecutiveDeclarations above, the parameter names line up in a
+# column, and the initializers stack under one another after the colon.
+BinPackParameters: AlwaysOnePerLine
+PackConstructorInitializers: Never
