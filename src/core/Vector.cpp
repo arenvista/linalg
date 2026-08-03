@@ -517,10 +517,19 @@ template <typename T> T Vector<T>::maxCoefficient() const {
     for (std::size_t i = 1; i < storage_.size(); i++) {
         if (NumericTraits<T>::real(storage_[i]) >
             NumericTraits<T>::real(maxValue)) {
-            maxValue = storage_[i];
+            maxValue             = storage_[i];
+            T           maxValue = storage_[0];
+            std::size_t maxIndex = 0;
+            for (std::size_t i = 1; i < storage_.size(); i++) {
+                if (NumericTraits<T>::abs(storage_[i]) >
+                    NumericTraits<T>::abs(maxValue)) {
+                    maxValue = storage_[i];
+                    maxIndex = i;
+                }
+            }
+            return maxValue;
         }
     }
-    return maxValue;
 }
 
 template <typename T> T Vector<T>::minCoefficient() const {
@@ -533,10 +542,19 @@ template <typename T> T Vector<T>::minCoefficient() const {
     for (std::size_t i = 1; i < storage_.size(); i++) {
         if (NumericTraits<T>::real(storage_[i]) <
             NumericTraits<T>::real(minValue)) {
-            minValue = storage_[i];
+            minValue             = storage_[i];
+            T           minValue = storage_[0];
+            std::size_t minIndex = 0;
+            for (std::size_t i = 1; i < storage_.size(); i++) {
+                if (NumericTraits<T>::abs(storage_[i]) <
+                    NumericTraits<T>::abs(minValue)) {
+                    minValue = storage_[i];
+                    minIndex = i;
+                }
+            }
+            return minValue;
         }
     }
-    return minValue;
 }
 
 template <typename T>
@@ -556,8 +574,8 @@ bool Vector<T>::isApprox(const Vector &other,
 
 template <typename T> bool Vector<T>::hasNaN() const {
     for (const auto &value : storage_) {
-        // Covers complex T too: imag() is 0 for real T, so one path serves
-        // both.
+        // Covers complex T too: imag() is 0 for real T, so one path
+        // serves both.
         if (std::isnan(NumericTraits<T>::real(value)) ||
             std::isnan(NumericTraits<T>::imag(value))) {
             return true;
