@@ -283,6 +283,7 @@ template <typename T> T Vector<T>::dot(const Vector &rhs) const {
     for (Index i = 0; i < size(); ++i) {
         sum += (*this)(i)*rhs(i);
     }
+    return sum;
 }
 
 template <typename T> T Vector<T>::hermitianDot(const Vector &rhs) const {
@@ -475,6 +476,9 @@ template <typename T> void Vector<T>::swap(Vector &other) {
 }
 
 template <typename T> typename Vector<T>::Index Vector<T>::maxAbsIndex() const {
+    if (storage_.empty()) {
+        throw LinalgError("linalg::Vector<T>::maxAbsIndex on empty vector");
+    }
     T           maxValue = storage_[0];
     std::size_t maxIndex = 0;
     for (std::size_t i = 1; i < storage_.size(); i++) {
@@ -488,6 +492,9 @@ template <typename T> typename Vector<T>::Index Vector<T>::maxAbsIndex() const {
 }
 
 template <typename T> typename Vector<T>::Index Vector<T>::minAbsIndex() const {
+    if (storage_.empty()) {
+        throw LinalgError("linalg::Vector<T>::minAbsIndex on empty vector");
+    }
     T           minValue = storage_[0];
     std::size_t minIndex = 0;
     for (std::size_t i = 1; i < storage_.size(); i++) {
@@ -501,26 +508,32 @@ template <typename T> typename Vector<T>::Index Vector<T>::minAbsIndex() const {
 }
 
 template <typename T> T Vector<T>::maxCoefficient() const {
-    T           maxValue = storage_[0];
-    std::size_t maxIndex = 0;
+    if (storage_.empty()) {
+        throw LinalgError("linalg::Vector<T>::maxCoefficient on empty vector");
+    }
+    // Contract: compare by real part (== value for real T); ties keep lowest
+    // index.
+    T maxValue = storage_[0];
     for (std::size_t i = 1; i < storage_.size(); i++) {
-        if (NumericTraits<T>::abs(storage_[i]) >
-            NumericTraits<T>::abs(maxValue)) {
+        if (NumericTraits<T>::real(storage_[i]) >
+            NumericTraits<T>::real(maxValue)) {
             maxValue = storage_[i];
-            maxIndex = i;
         }
     }
     return maxValue;
 }
 
 template <typename T> T Vector<T>::minCoefficient() const {
-    T           minValue = storage_[0];
-    std::size_t minIndex = 0;
+    if (storage_.empty()) {
+        throw LinalgError("linalg::Vector<T>::minCoefficient on empty vector");
+    }
+    // Contract: compare by real part (== value for real T); ties keep lowest
+    // index.
+    T minValue = storage_[0];
     for (std::size_t i = 1; i < storage_.size(); i++) {
-        if (NumericTraits<T>::abs(storage_[i]) <
-            NumericTraits<T>::abs(minValue)) {
+        if (NumericTraits<T>::real(storage_[i]) <
+            NumericTraits<T>::real(minValue)) {
             minValue = storage_[i];
-            minIndex = i;
         }
     }
     return minValue;
@@ -529,7 +542,16 @@ template <typename T> T Vector<T>::minCoefficient() const {
 template <typename T>
 bool Vector<T>::isApprox(const Vector &other,
                          Real          tolerance) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::isApprox");
+    if (size() != other.size()) {
+        return false;
+    }
+    for (Index i = 0; i < size(); ++i) {
+        // isApproxZero(x, tol) is |x| <= tol; works for complex T too.
+        if (!NumericTraits<T>::isApproxZero((*this)(i)-other(i), tolerance)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 template <typename T> bool Vector<T>::hasNaN() const {
