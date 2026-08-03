@@ -292,11 +292,24 @@ template <typename T> T Vector<T>::hermitianDot(const Vector &rhs) const {
 }
 
 template <typename T> Matrix<T> Vector<T>::outer(const Vector &rhs) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::outer");
+    Matrix<T> result(size(), rhs.size());
+    for (Index i = 0; i < size(); ++i) {
+        for (Index j = 0; j < rhs.size(); ++j) {
+            result(i, j) = (*this)(i) * NumericTraits<T>::conj(rhs(j));
+        }
+    }
+    return result;
 }
 
 template <typename T> Vector<T> Vector<T>::cross(const Vector &rhs) const {
-    throw LinalgError("not implemented: linalg::Vector<T>::cross");
+    if (size() != 3 || rhs.size() != 3) {
+        throw DimensionMismatch(size(), 1, rhs.size(), 1);
+    }
+    Vector result(3);
+    result(0) = (*this)(1) * rhs(2) - (*this)(2) * rhs(1);
+    result(1) = (*this)(2) * rhs(0) - (*this)(0) * rhs(2);
+    result(2) = (*this)(0) * rhs(1) - (*this)(1) * rhs(0);
+    return result;
 }
 
 template <typename T>
