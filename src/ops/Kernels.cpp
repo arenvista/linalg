@@ -194,7 +194,50 @@ void Kernels<T>::trsv(Triangle::Kind            uplo,
                       const ConstMatrixView<T> &a,
                       T                        *x,
                       Index                     incx) {
-    throw LinalgError("not implemented: linalg::Kernels<T>::trsv");
+    const bool  transposed = (trans != Transposition::Kind::None);
+    const bool  conjugate  = (trans == Transposition::Kind::ConjugateTranspose);
+    const bool  unit       = (diag == Diagonal::Kind::Unit);
+    const Index n          = a.rows();
+
+    // Element of op(a) at logical (i, j): a itself, or a^T / a^H.
+    const auto opA = [&](Index i, Index j) -> T {
+        if (!transposed) {
+            return a(i, j);
+        }
+        const T v = a(j, i);
+        return conjugate ? NumericTraits<T>::conj(v) : v;
+    };
+
+    // Transposing flips which triangle op(a) occupies, so the substitution
+    // direction follows the *effective* triangle, not the stored one.
+    bool opLower = (uplo == Triangle::Kind::Lower);
+    if (transposed) {
+        opLower = !opLower;
+    }
+
+    if (opLower) { // forward substitution
+        for (Index i = 0; i < n; ++i) {
+            T s = x[i * incx];
+            for (Index j = 0; j < i; ++j) {
+                s -= opA(i, j) * x[j * incx];
+            }
+            if (!unit) {
+                s /= opA(i, i);
+            }
+            x[i * incx] = s;
+        }
+    } else { // back substitution
+        for (Index i = n; i-- > 0;) {
+            T s = x[i * incx];
+            for (Index j = i + 1; j < n; ++j) {
+                s -= opA(i, j) * x[j * incx];
+            }
+            if (!unit) {
+                s /= opA(i, i);
+            }
+            x[i * incx] = s;
+        }
+    }
 }
 
 template <typename T>
@@ -206,7 +249,29 @@ void Kernels<T>::symv(Triangle::Kind            uplo,
                       const T                  &beta,
                       T                        *y,
                       Index                     incy) {
-    throw LinalgError("not implemented: linalg::Kernels<T>::symv");
+    const Index n = a.rows();
+
+    // Symmetric (not Hermitian): the untouched triangle mirrors the stored
+    // one with no conjugation, so a(i,j) == a(j,i).
+    const auto sym = [&](Index i, Index j) -> T {
+        if (uplo == Triangle::Kind::Upper) {
+            return (j >= i) ? a(i, j) : a(j, i);
+        }
+        return (i >= j) ? a(i, j) : a(j, i);
+    };
+
+    for (Index i = 0; i < n; ++i) {
+        T acc = T{};
+        for (Index j = 0; j < n; ++j) {
+            acc += sym(i, j) * x[j * incx];
+        }
+        // beta == 0 means y is write-only: do not read it.
+        if (beta == T{}) {
+            y[i * incy] = alpha * acc;
+        } else {
+            y[i * incy] = alpha * acc + beta * y[i * incy];
+        }
+    }
 }
 
 template <typename T>
@@ -217,7 +282,37 @@ void Kernels<T>::gemm(Transposition::Kind       transA,
                       const ConstMatrixView<T> &b,
                       const T                  &beta,
                       MatrixView<T>             c) {
-    throw LinalgError("not implemented: linalg::Kernels<T>::gemm");
+    // op(m) element at logical (i, j): m, m^T, or m^H.
+    const auto op = [](const ConstMatrixView<T> &m, Transposition::Kind t,
+                       Index i, Index j) -> T {
+        if (t == Transposition::Kind::None) {
+            return m(i, j);
+        }
+        const T v = m(j, i);
+        return (t == Transposition::Kind::ConjugateTranspose)
+                   ? NumericTraits<T>::conj(v)
+                   : v;
+    };
+
+    const Index m = c.rows();
+    const Index n = c.cols();
+    // Shared inner dimension: cols of op(a) == rows of op(b).
+    const Index k = (transA == Transposition::Kind::None) ? a.cols() : a.rows();
+
+    for (Index i = 0; i < m; ++i) {
+        for (Index j = 0; j < n; ++j) {
+            T acc = T{};
+            for (Index l = 0; l < k; ++l) {
+                acc += op(a, transA, i, l) * op(b, transB, l, j);
+            }
+            // beta == 0 means c is write-only: do not read it.
+            if (beta == T{}) {
+                c(i, j) = alpha * acc;
+            } else {
+                c(i, j) = alpha * acc + beta * c(i, j);
+            }
+        }
+    }
 }
 
 template <typename T>
@@ -227,7 +322,32 @@ void Kernels<T>::syrk(Triangle::Kind            uplo,
                       const ConstMatrixView<T> &a,
                       const T                  &beta,
                       MatrixView<T>             c) {
-    throw LinalgError("not implemented: linalg::Kernels<T>::syrk");
+    // op(a) is a (None) or a^H (ConjugateTranspose); result c = alpha *
+    // op(a) * op(a)^H + beta * c, writing only the `uplo` triangle.
+    const bool  conjugate = (trans != Transposition::Kind::None);
+    const Index n         = conjugate ? a.cols() : a.rows();
+    const Index k         = conjugate ? a.rows() : a.cols();
+
+    const auto opA = [&](Index i, Index l) -> T { // op(a)(i, l)
+        return conjugate ? NumericTraits<T>::conj(a(l, i)) : a(i, l);
+    };
+
+    for (Index i = 0; i < n; ++i) {
+        const Index jlo = (uplo == Triangle::Kind::Upper) ? i : 0;
+        const Index jhi = (uplo == Triangle::Kind::Upper) ? n : i + 1;
+        for (Index j = jlo; j < jhi; ++j) {
+            T acc = T{};
+            for (Index l = 0; l < k; ++l) {
+                // (op(a) op(a)^H)(i,j) = sum_l op(a)(i,l) * conj(op(a)(j,l)).
+                acc += opA(i, l) * NumericTraits<T>::conj(opA(j, l));
+            }
+            if (beta == T{}) {
+                c(i, j) = alpha * acc;
+            } else {
+                c(i, j) = alpha * acc + beta * c(i, j);
+            }
+        }
+    }
 }
 
 template <typename T>
@@ -237,7 +357,52 @@ void Kernels<T>::trsm(Triangle::Kind            uplo,
                       const T                  &alpha,
                       const ConstMatrixView<T> &a,
                       MatrixView<T>             b) {
-    throw LinalgError("not implemented: linalg::Kernels<T>::trsm");
+    // b <- alpha * op(a)^-1 * b: solve op(a) X = alpha * b for each column,
+    // reusing the trsv substitution structure.
+    const bool  transposed = (trans != Transposition::Kind::None);
+    const bool  conjugate  = (trans == Transposition::Kind::ConjugateTranspose);
+    const bool  unit       = (diag == Diagonal::Kind::Unit);
+    const Index n          = a.rows();
+    const Index nrhs       = b.cols();
+
+    const auto opA = [&](Index i, Index j) -> T {
+        if (!transposed) {
+            return a(i, j);
+        }
+        const T v = a(j, i);
+        return conjugate ? NumericTraits<T>::conj(v) : v;
+    };
+
+    bool opLower = (uplo == Triangle::Kind::Lower);
+    if (transposed) {
+        opLower = !opLower;
+    }
+
+    for (Index col = 0; col < nrhs; ++col) {
+        if (opLower) { // forward substitution
+            for (Index i = 0; i < n; ++i) {
+                T s = alpha * b(i, col);
+                for (Index j = 0; j < i; ++j) {
+                    s -= opA(i, j) * b(j, col);
+                }
+                if (!unit) {
+                    s /= opA(i, i);
+                }
+                b(i, col) = s;
+            }
+        } else { // back substitution
+            for (Index i = n; i-- > 0;) {
+                T s = alpha * b(i, col);
+                for (Index j = i + 1; j < n; ++j) {
+                    s -= opA(i, j) * b(j, col);
+                }
+                if (!unit) {
+                    s /= opA(i, i);
+                }
+                b(i, col) = s;
+            }
+        }
+    }
 }
 
 template <typename T>
