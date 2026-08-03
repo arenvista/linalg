@@ -5,7 +5,13 @@ target_link_libraries(test_instantiate PRIVATE linalg::linalg)
 target_compile_options(test_instantiate PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
 add_test(NAME instantiate COMMAND test_instantiate)
 
-# Add behavioural tests alongside as classes get implemented, e.g.
+# Behavioural tests for the Vector class.
+add_executable(test_vector test_vector.cpp)
+target_link_libraries(test_vector PRIVATE linalg::linalg)
+target_compile_options(test_vector PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
+add_test(NAME vector COMMAND test_vector)
+
+# Add more behavioural tests alongside as classes get implemented, e.g.
 #
 #   add_executable(test_matrix test_matrix.cpp)
 #   target_link_libraries(test_matrix PRIVATE linalg::linalg)
