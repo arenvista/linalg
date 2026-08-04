@@ -30,7 +30,7 @@ typename Norm<T>::Real Norm<T>::vectorP(const Vector<T> &x,
 
 template <typename T>
 typename Norm<T>::Real Norm<T>::vectorTwoScaled(const Vector<T> &x) {
-    return x.squaredNorm();
+    return x.norm();
 }
 
 // TODO: Requires SVD
