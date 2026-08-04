@@ -420,8 +420,10 @@ void test_pseudo_inverse() { // Phase 4 back-fill (SVD)
 void test_predicates() {
     M s{{1, 2}, {2, 3}};
     assert(s.isSymmetric(0.0));
-    assert(!M{{1, 2}, {3, 4}}.isSymmetric(0.0));
-    assert(M{{1, 2}, {3, 4}}.isSymmetric(1.5)); // within loose tolerance
+    M ns{{1, 2}, {3, 4}}; // not symmetric (named: a brace literal inside
+                          // assert() would split on its commas)
+    assert(!ns.isSymmetric(0.0));
+    assert(ns.isSymmetric(1.5)); // within loose tolerance
 
     MC h{{C(1, 0), C(2, 3)}, {C(2, -3), C(5, 0)}};
     assert(h.isHermitian(0.0));
@@ -429,7 +431,8 @@ void test_predicates() {
     assert(!nh.isHermitian(1e-12));
 
     assert(M::Diagonal(V{1, 2}).isDiagonal(0.0));
-    assert(!M{{1, 1}, {0, 1}}.isDiagonal(0.0));
+    M notDiag{{1, 1}, {0, 1}};
+    assert(!notDiag.isDiagonal(0.0));
 
     M up{{1, 2}, {0, 3}};
     assert(up.isTriangular(Triangle::Kind::Upper, 0.0));
@@ -438,8 +441,10 @@ void test_predicates() {
 
     assert(M::Identity(3).isOrthogonal(0.0));
     // rotation by 90 degrees is orthogonal
-    assert(M{{0, -1}, {1, 0}}.isOrthogonal(1e-14));
-    assert(!M{{2, 0}, {0, 1}}.isOrthogonal(1e-6));
+    M rot{{0, -1}, {1, 0}};
+    assert(rot.isOrthogonal(1e-14));
+    M scaled{{2, 0}, {0, 1}};
+    assert(!scaled.isOrthogonal(1e-6));
 
     assert(!M::Ones(2, 2).hasNaN());
     M nan{{1, 2}, {3, 4}};
