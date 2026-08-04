@@ -24,17 +24,20 @@ using namespace linalg;
 using testharness::finish;
 using testharness::run;
 
-using M = Matrix<double>;
-using V = Vector<double>;
-using C = std::complex<double>;
-using H = Householder<double>;
+using M  = Matrix<double>;
+using V  = Vector<double>;
+using C  = std::complex<double>;
+using H  = Householder<double>;
 using HC = Householder<C>;
 
 namespace {
 
 constexpr double kTol = 1e-12;
 
-bool close(double a, double b) { return std::abs(a - b) < kTol; }
+bool close(double a,
+           double b) {
+    return std::abs(a - b) < kTol;
+}
 
 void test_identity_reflector() {
     H h;
@@ -94,13 +97,13 @@ void test_apply_left_right() {
     H h = H::FromVector(x);
     M a{{1, 2, 3}, {4, 5, 6}};
     M byMatrix = h.toMatrix(2) * a;
-    M inPlace = a;
+    M inPlace  = a;
     h.applyLeft(inPlace.view());
     assert(inPlace.isApprox(byMatrix, kTol));
 
     M b{{1, 2}, {3, 4}, {5, 6}};
     M byMatrixR = b * h.toMatrix(2);
-    M inPlaceR = b;
+    M inPlaceR  = b;
     h.applyRight(inPlaceR.view());
     assert(inPlaceR.isApprox(byMatrixR, kTol));
 }
@@ -120,7 +123,7 @@ void test_from_column() {
 void test_complex_reflector() {
     // the standing reminder: test with a complex scalar before moving on
     Vector<C> x{C(3, 4), C(1, -2), C(0, 1)};
-    HC h = HC::FromVector(x);
+    HC        h = HC::FromVector(x);
     // beta is real-valued even for complex T
     assert(std::abs(NumericTraits<C>::imag(h.beta())) < 1e-12);
     Vector<C> y = x;
@@ -151,8 +154,8 @@ void test_sequence_empty() {
 
 void test_sequence_product_order() {
     // Q = H_0 * H_1 in append order
-    H h0 = H::FromVector(V{1, 2, 2});
-    H h1 = H::FromVector(V{3, 4});
+    H                           h0 = H::FromVector(V{1, 2, 2});
+    H                           h1 = H::FromVector(V{3, 4});
     HouseholderSequence<double> seq;
     seq.append(h0);
     seq.append(h1);
@@ -164,8 +167,8 @@ void test_sequence_product_order() {
 }
 
 void test_sequence_apply() {
-    H h0 = H::FromVector(V{1, 2, 2});
-    H h1 = H::FromVector(V{3, 4});
+    H                           h0 = H::FromVector(V{1, 2, 2});
+    H                           h1 = H::FromVector(V{3, 4});
     HouseholderSequence<double> seq;
     seq.append(h0);
     seq.append(h1);
@@ -185,7 +188,7 @@ void test_sequence_apply() {
 }
 
 void test_sequence_first_columns() {
-    H h0 = H::FromVector(V{1, 2, 2});
+    H                           h0 = H::FromVector(V{1, 2, 2});
     HouseholderSequence<double> seq;
     seq.append(h0);
     M thin = seq.firstColumns(3, 2);
@@ -197,8 +200,8 @@ void test_sequence_first_columns() {
 }
 
 void test_sequence_block_representation() { // Phase 6 (compact WY)
-    H h0 = H::FromVector(V{1, 2, 2});
-    H h1 = H::FromVector(V{3, 4});
+    H                           h0 = H::FromVector(V{1, 2, 2});
+    H                           h1 = H::FromVector(V{3, 4});
     HouseholderSequence<double> seq;
     seq.append(h0);
     seq.append(h1);
@@ -216,7 +219,8 @@ int main() {
     run("from_vector_lands_on_e1", test_from_vector_lands_on_e1);
     run("involutory", test_involutory);
     run("to_matrix_properties", test_to_matrix_properties);
-    run("to_matrix_agrees_with_apply_left", test_to_matrix_agrees_with_apply_left);
+    run("to_matrix_agrees_with_apply_left",
+        test_to_matrix_agrees_with_apply_left);
     run("apply_left_right", test_apply_left_right);
     run("from_column", test_from_column);
     run("complex_reflector", test_complex_reflector);

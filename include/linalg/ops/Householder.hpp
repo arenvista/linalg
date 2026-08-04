@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <vector>
 
 #include "linalg/core/Matrix.hpp"
 #include "linalg/core/MatrixView.hpp"
@@ -144,11 +145,12 @@ public:
     void      buildBlockRepresentation(Index blockSize);
 
 private:
-    Matrix<T> reflectors_;
-    Vector<T> betas_;
-    Matrix<T> blockV_;
-    Matrix<T> blockT_;
-    bool      blockValid_;
+    // Phase 1 stores the reflectors directly; the compact WY block
+    // factors (blockV_/blockT_) are reintroduced in Phase 6 alongside
+    // buildBlockRepresentation. Keeping no Matrix members here means a
+    // sequence is usable before core Matrix is implemented.
+    std::vector<Householder<T>> reflectors_;
+    bool                        blockValid_ = false;
 };
 
 
