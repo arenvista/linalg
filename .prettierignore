@@ -1,0 +1,12 @@
+# Build output
+build/
+cmake-build-*/
+
+# C/C++ sources — Prettier doesn't format these; use clang-format instead
+include/
+src/
+tests/
+benchmarks/
+
+# Binary / non-markdown docs
+*.pdf

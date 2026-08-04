@@ -6,3 +6,4 @@ build/
 # Absolute paths inside make it machine-specific. Regenerate with
 # tools/gen-compile-commands.zsh rather than committing it.
 compile_commands.json
+PLAN.pdf
