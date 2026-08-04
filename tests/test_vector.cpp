@@ -2,11 +2,15 @@
 //
 // Convention (matches the rest of tests/): the program exits 0 on success and
 // aborts via assert() on the first failure, which ctest reports as a failure.
-// Kept free of any Matrix-returning methods (outer/as*Matrix) and
-// conservativeResize, which depend on code not yet implemented.
+// The Matrix-returning methods (outer/as*Matrix) and conservativeResize
+// depend on code not yet implemented, so those tests run through the skip
+// harness and report as Skipped until it lands.
 
 #include "linalg/core/Exceptions.hpp"
+#include "linalg/core/Matrix.hpp"
 #include "linalg/core/Vector.hpp"
+
+#include "harness.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -241,6 +245,38 @@ void test_predicates_and_misc() {
     assert(Vector<double>({1.0}).toString(3) == "[1]");
 }
 
+// The stragglers: everything below needs Matrix (or is still a stub), so it
+// runs through the skip harness instead of aborting the whole binary.
+
+void test_conservative_resize() {
+    Vector<double> v{1.0, 2.0, 3.0};
+    v.conservativeResize(5); // keeps the head, zero-fills the growth
+    assert(v == Vector<double>({1.0, 2.0, 3.0, 0.0, 0.0}));
+    v.conservativeResize(2); // truncates
+    assert(v == Vector<double>({1.0, 2.0}));
+    v.conservativeResize(0);
+    assert(v.isEmpty());
+}
+
+void test_matrix_bridging() {
+    Vector<double> x{1.0, 2.0}, y{10.0, 20.0, 30.0};
+    // outer product: x y^H is 2x3 with (i,j) = x_i * y_j
+    Matrix<double> o = x.outer(y);
+    assert(o.rows() == 2 && o.cols() == 3);
+    assert(o(0, 0) == 10.0 && o(0, 2) == 30.0 && o(1, 1) == 40.0);
+    // complex outer conjugates the right factor
+    Vector<C> cx{C(0, 1)}, cy{C(0, 1)};
+    assert(cx.outer(cy)(0, 0) == C(1, 0)); // i * conj(i) = 1
+    // as*Matrix shapes and values
+    Matrix<double> col = x.asColumnMatrix();
+    assert(col.rows() == 2 && col.cols() == 1 && col(1, 0) == 2.0);
+    Matrix<double> row = x.asRowMatrix();
+    assert(row.rows() == 1 && row.cols() == 2 && row(0, 1) == 2.0);
+    Matrix<double> diag = x.asDiagonalMatrix();
+    assert(diag.rows() == 2 && diag.cols() == 2);
+    assert(diag(0, 0) == 1.0 && diag(1, 1) == 2.0 && diag(0, 1) == 0.0);
+}
+
 } // namespace
 
 int main() {
@@ -253,5 +289,7 @@ int main() {
     test_reductions();
     test_predicates_and_misc();
     std::puts("all Vector behavioural tests passed");
-    return 0;
+    testharness::run("conservative_resize", test_conservative_resize);
+    testharness::run("matrix_bridging", test_matrix_bridging);
+    return testharness::finish("Vector stragglers");
 }
