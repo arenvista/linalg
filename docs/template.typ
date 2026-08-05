@@ -21,15 +21,24 @@
 	set par(justify: true, leading: 0.65em)
 
 	// Headings
-	// set heading(numbering: "1.1")
-	// show heading.where(level: 1): it => {
-	//   set text(size: 15pt)
-	//   block(above: 1.4em, below: 0.8em, it)
-	// }
-	// show heading.where(level: 2): it => {
-	//   set text(size: 12.5pt)
-	//   block(above: 1.1em, below: 0.6em, it)
-	// }
+	set heading(numbering: "1.1")
+	show heading.where(level: 1): it => {
+		set text(size: 15pt)
+		block(above: 1.4em, below: 0.8em, it)
+	}
+	show heading.where(level: 2): it => {
+		set text(size: 12.5pt)
+		block(above: 1.1em, below: 0.6em, it)
+	}
+	// Level 3 = method signatures: rendered as a boxed monospace label.
+	show heading.where(level: 3): it => block(
+		width: 100%,
+		fill: luma(240),
+		inset: (x: 8pt, y: 6pt),
+		radius: 3pt,
+		below: 0.8em,
+		text(font: "DejaVu Sans Mono", size: 11pt, weight: "bold", it.body),
+	)
 
 	// Equations numbered by section
 	set math.equation(numbering: "(1.1)")
@@ -115,6 +124,64 @@
 // )[
 //   #emph[Proof.] #h(0.3em) #body #h(1fr) $square$
 // ]
+
+// ---- Method / API documentation environment ----
+// Documents a single method/function in a consistent layout:
+//   name        the method signature/name, shown as a subheading (e.g. "epsilon()")
+//   example     raw block (```cpp ... ```) showing typical usage — optional
+//   description content describing what the method does — optional
+//   params      array of (name, desc) pairs; rendered as a term list — optional
+//   returns     content describing the return value — optional
+#let method(
+	name,
+	example: none,
+	description: none,
+	params: (),
+	returns: none,
+) = block(
+	width: 100%,
+	above: 1.2em,
+	below: 1.2em,
+	stroke: 0.75pt + luma(180),
+	radius: 4pt,
+	inset: 10pt,
+	breakable: false, // keep the whole block together; push to next page if it would split
+	{
+		// Method name / signature — a level-3 heading so it appears in the
+		// outline (table of contents); styled as a boxed monospace signature
+		// by the show rule in `notes`.
+		heading(level: 3, numbering: none, name)
+
+		if example != none {
+			text(weight: "bold", fill: luma(90), size: 10pt)[Example]
+			v(0.2em)
+			example
+			v(0.5em)
+		}
+
+		if description != none {
+			text(weight: "bold", fill: luma(90), size: 10pt)[Description]
+			v(0.2em)
+			description
+			v(0.5em)
+		}
+
+		if params.len() > 0 {
+			text(weight: "bold", fill: luma(90), size: 10pt)[Parameters]
+			v(0.2em)
+			terms(
+				..params.map(p => terms.item(raw(p.at(0)), p.at(1))),
+			)
+			v(0.5em)
+		}
+
+		if returns != none {
+			text(weight: "bold", fill: luma(90), size: 10pt)[Returns]
+			v(0.2em)
+			returns
+		}
+	},
+)
 
 // ---- Handy math shortcuts ----
 #let RR = math.bb("R")
