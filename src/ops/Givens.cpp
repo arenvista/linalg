@@ -149,60 +149,87 @@ template <typename T> void Givens<T>::applyRight(MatrixView<T> target) const {
 }
 
 template <typename T> void Givens<T>::apply(Vector<T> &x) const {
-    throw LinalgError("not implemented: linalg::Givens<T>::apply");
+    // Rotate entries p and q in place; every other entry is untouched.
+    //   x_p <-        c  * x_p + s * x_q
+    //   x_q <- -conj(s) * x_p + c * x_q
+    const T negConjSine = -NumericTraits<T>::conj(sine_);
+    const T xP          = x(p_);
+    const T xQ          = x(q_);
+    x(p_)               = cosine_ * xP + sine_ * xQ;
+    x(q_)               = negConjSine * xP + cosine_ * xQ;
 }
 
 template <typename T> Matrix<T> Givens<T>::toMatrix(Index dimension) const {
-    throw LinalgError("not implemented: linalg::Givens<T>::toMatrix");
+    // Embed the 2x2 block [c, s; -conj(s), c] in an identity of the given
+    // size; every entry off the (p, q) plane is left as the identity.
+    Matrix<T> result = Matrix<T>::Identity(dimension);
+    result(p_, p_)   = cosine_;
+    result(p_, q_)   = sine_;
+    result(q_, p_)   = -NumericTraits<T>::conj(sine_);
+    result(q_, q_)   = cosine_;
+    return result;
 }
 
-template <typename T> GivensSequence<T>::GivensSequence() {
-    throw LinalgError(
-        "not implemented: linalg::GivensSequence<T>::GivensSequence");
-}
+template <typename T>
+GivensSequence<T>::GivensSequence()
+    : rotations_() {}
 
 template <typename T>
 void GivensSequence<T>::append(const Givens<T> &rotation) {
-    throw LinalgError("not implemented: linalg::GivensSequence<T>::append");
+    rotations_.push_back(rotation);
 }
 
-template <typename T> void GivensSequence<T>::clear() {
-    throw LinalgError("not implemented: linalg::GivensSequence<T>::clear");
-}
+template <typename T> void GivensSequence<T>::clear() { rotations_.clear(); }
 
 template <typename T>
 typename GivensSequence<T>::Index GivensSequence<T>::count() const {
-    throw LinalgError("not implemented: linalg::GivensSequence<T>::count");
+    return rotations_.size();
 }
 
 template <typename T>
 const Givens<T> &GivensSequence<T>::operator[](Index k) const {
-    throw LinalgError("not implemented: linalg::GivensSequence<T>::operator[]");
+    return rotations_[k];
 }
 
 template <typename T>
 void GivensSequence<T>::applyLeft(MatrixView<T> target) const {
-    throw LinalgError("not implemented: linalg::GivensSequence<T>::applyLeft");
+    // Append order: target <- G_{k-1} ... G_1 G_0 * target. Applying G_0
+    // first and G_{k-1} last leaves the earliest rotation innermost.
+    for (Index k = 0; k < rotations_.size(); ++k) {
+        rotations_[k].applyLeft(target);
+    }
 }
 
 template <typename T>
 void GivensSequence<T>::applyRight(MatrixView<T> target) const {
-    throw LinalgError("not implemented: linalg::GivensSequence<T>::applyRight");
+    // Append order on the right: target <- target * G_0 G_1 ... G_{k-1}.
+    for (Index k = 0; k < rotations_.size(); ++k) {
+        rotations_[k].applyRight(target);
+    }
 }
 
 template <typename T>
 void GivensSequence<T>::applyLeftReversed(MatrixView<T> target) const {
-    throw LinalgError(
-        "not implemented: linalg::GivensSequence<T>::applyLeftReversed");
+    // Opposite of applyLeft: apply the last-appended rotation first, so
+    // target <- G_0 G_1 ... G_{k-1} * target.
+    for (Index k = rotations_.size(); k-- > 0;) {
+        rotations_[k].applyLeft(target);
+    }
 }
 
 template <typename T> GivensSequence<T> GivensSequence<T>::reversed() const {
-    throw LinalgError("not implemented: linalg::GivensSequence<T>::reversed");
+    GivensSequence result;
+    result.rotations_.assign(rotations_.rbegin(), rotations_.rend());
+    return result;
 }
 
 template <typename T>
 Matrix<T> GivensSequence<T>::toMatrix(Index dimension) const {
-    throw LinalgError("not implemented: linalg::GivensSequence<T>::toMatrix");
+    // The accumulated product G_{k-1} ... G_1 G_0 is exactly applyLeft acting
+    // on the identity of the requested size.
+    Matrix<T> result = Matrix<T>::Identity(dimension);
+    applyLeft(result.view());
+    return result;
 }
 
 // Explicit instantiation. Every scalar the library ships is
