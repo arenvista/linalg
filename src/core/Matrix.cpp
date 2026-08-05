@@ -5,9 +5,14 @@
 #include "linalg/core/MatrixView.hpp"
 #include "linalg/core/Traits.hpp"
 #include "linalg/core/Vector.hpp"
+#include "linalg/ops/Kernels.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <initializer_list>
+#include <iomanip>
 #include <random>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -309,13 +314,6 @@ template <typename T> bool Matrix<T>::isSquare() const {
 }
 
 // views
-
-// Only view() touches the raw stride constructor: the storage is row-major,
-// so moving down a row advances cols_ elements and moving right advances 1.
-// Everything else delegates to MatrixView, which already rebases the
-// pointer, keeps the parent's strides so the sub-view aliases rather than
-// copies, and range-checks the block.
-
 template <typename T> MatrixView<T> Matrix<T>::view() {
     return MatrixView<T>(storage_.data(), rows_, cols_, cols_, 1);
 }
@@ -422,171 +420,357 @@ void Matrix<T>::setBlock(Index         i,
 }
 
 // arithmetic
+
 template <typename T> Matrix<T> Matrix<T>::operator+(const Matrix &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator+");
+    checkSameShape(rhs);
+    Matrix result(*this);
+    Kernels<T>::axpy(size(), T(1), rhs.storage_.data(), 1,
+                     result.storage_.data(), 1);
+    return result;
 }
 
 template <typename T> Matrix<T> Matrix<T>::operator-(const Matrix &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator-");
+    checkSameShape(rhs);
+    Matrix result(*this);
+    Kernels<T>::axpy(size(), T(-1), rhs.storage_.data(), 1,
+                     result.storage_.data(), 1);
+    return result;
 }
 
 template <typename T> Matrix<T> Matrix<T>::operator*(const Matrix &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator*");
+    if (cols_ != rhs.rows_) {
+        throw DimensionMismatch(rows_, cols_, rhs.rows_, rhs.cols_);
+    }
+    // beta == 0 makes the output write-only, so the constructor's zero fill
+    // is not depended on; result is fresh, so it cannot alias either operand.
+    Matrix result(rows_, rhs.cols_);
+    Kernels<T>::gemm(Transposition::Kind::None, Transposition::Kind::None, T(1),
+                     view(), rhs.view(), T{}, result.view());
+    return result;
 }
 
 template <typename T>
 Vector<T> Matrix<T>::operator*(const Vector<T> &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator*");
+    if (cols_ != rhs.size()) {
+        throw DimensionMismatch(rows_, cols_, rhs.size(), 1);
+    }
+    Vector<T> result(rows_);
+    Kernels<T>::gemv(Transposition::Kind::None, T(1), view(), rhs.data(), 1,
+                     T{}, result.data(), 1);
+    return result;
 }
 
 template <typename T> Matrix<T> Matrix<T>::operator*(const T &scalar) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator*");
+    Matrix result(*this);
+    Kernels<T>::scal(result.size(), scalar, result.storage_.data(), 1);
+    return result;
 }
 
 template <typename T> Matrix<T> Matrix<T>::operator/(const T &scalar) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator/");
+    // Divides rather than scaling by 1/scalar: the reciprocal rounds twice
+    // and overflows for subnormal divisors.
+    Matrix result(rows_, cols_);
+    for (Index k = 0; k < size(); ++k) {
+        result.storage_[k] = storage_[k] / scalar;
+    }
+    return result;
 }
 
 template <typename T> Matrix<T> Matrix<T>::operator-() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator-");
+    Matrix result(*this);
+    Kernels<T>::scal(result.size(), T(-1), result.storage_.data(), 1);
+    return result;
 }
 
 template <typename T> Matrix<T> &Matrix<T>::operator+=(const Matrix &rhs) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator+=");
+    checkSameShape(rhs);
+    Kernels<T>::axpy(size(), T(1), rhs.storage_.data(), 1, storage_.data(), 1);
+    return *this;
 }
 
 template <typename T> Matrix<T> &Matrix<T>::operator-=(const Matrix &rhs) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator-=");
+    checkSameShape(rhs);
+    Kernels<T>::axpy(size(), T(-1), rhs.storage_.data(), 1, storage_.data(), 1);
+    return *this;
 }
 
 template <typename T> Matrix<T> &Matrix<T>::operator*=(const Matrix &rhs) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator*=");
+    // gemm forbids the output aliasing an input, and the shape changes when
+    // rhs is not square, so this cannot accumulate in place.
+    *this = (*this) * rhs;
+    return *this;
 }
 
 template <typename T> Matrix<T> &Matrix<T>::operator*=(const T &scalar) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator*=");
+    Kernels<T>::scal(size(), scalar, storage_.data(), 1);
+    return *this;
 }
 
 template <typename T> Matrix<T> &Matrix<T>::operator/=(const T &scalar) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator/=");
+    for (Index k = 0; k < size(); ++k) {
+        storage_[k] /= scalar;
+    }
+    return *this;
 }
 
 template <typename T> bool Matrix<T>::operator==(const Matrix &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator==");
+    // Exact equality, shape included; isApprox is the tolerant comparison.
+    return rows_ == rhs.rows_ && cols_ == rhs.cols_ && storage_ == rhs.storage_;
 }
 
 template <typename T> bool Matrix<T>::operator!=(const Matrix &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::operator!=");
+    return !(*this == rhs);
 }
 
 template <typename T> Matrix<T> Matrix<T>::scaledBy(const T &scalar) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::scaledBy");
+    return (*this) * scalar;
 }
 
 template <typename T>
 Matrix<T> Matrix<T>::elementwiseProduct(const Matrix &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::elementwiseProduct");
+    checkSameShape(rhs);
+    Matrix result(rows_, cols_);
+    for (Index k = 0; k < size(); ++k) {
+        result.storage_[k] = storage_[k] * rhs.storage_[k];
+    }
+    return result;
 }
 
 template <typename T>
 Matrix<T> Matrix<T>::elementwiseQuotient(const Matrix &rhs) const {
-    throw LinalgError(
-        "not implemented: linalg::Matrix<T>::elementwiseQuotient");
+    checkSameShape(rhs);
+    Matrix result(rows_, cols_);
+    for (Index k = 0; k < size(); ++k) {
+        result.storage_[k] = storage_[k] / rhs.storage_[k];
+    }
+    return result;
 }
 
 template <typename T>
 Matrix<T> Matrix<T>::kroneckerProduct(const Matrix &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::kroneckerProduct");
+
+    Matrix result(rows_ * rhs.rows_, cols_ * rhs.cols_);
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            const T factor = (*this)(i, j);
+            for (Index r = 0; r < rhs.rows_; ++r) {
+                for (Index c = 0; c < rhs.cols_; ++c) {
+                    result(i * rhs.rows_ + r, j * rhs.cols_ + c) =
+                        factor * rhs(r, c);
+                }
+            }
+        }
+    }
+    return result;
 }
 
 template <typename T> Matrix<T> Matrix<T>::power(Index exponent) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::power");
+    if (!isSquare()) {
+        throw DimensionMismatch(rows_, cols_, cols_, rows_);
+    }
+    // Binary exponentiation: ~log2(exponent) products rather than exponent
+    // of them. Exponent 0 gives the identity, including for a 0 x 0 matrix.
+    Matrix result = Identity(rows_);
+    Matrix base(*this);
+    for (Index e = exponent; e != 0; e >>= 1) {
+        if (e & 1) {
+            result *= base;
+        }
+        base *= base;
+    }
+    return result;
 }
 
 // element manip
 template <typename T> Matrix<T> Matrix<T>::transpose() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::transpose");
+    // transposed() swaps shape and strides without copying; toMatrix then
+    // walks that view into fresh contiguous row-major storage.
+    return view().transposed().toMatrix();
 }
 
 template <typename T> Matrix<T> Matrix<T>::conjugateTranspose() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::conjugateTranspose");
+    // Not transpose() + a conj pass: one traversal, and conj is the
+    // identity for real T, so this collapses to a plain transpose there.
+    Matrix result(cols_, rows_);
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            result(j, i) = NumericTraits<T>::conj((*this)(i, j));
+        }
+    }
+    return result;
 }
 
 template <typename T>
 Matrix<T> Matrix<T>::reshaped(Index rows,
                               Index cols) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::reshaped");
+    if (rows * cols != size()) {
+        throw DimensionMismatch(rows_, cols_, rows, cols);
+    }
+
+    Matrix result(*this);
+    result.rows_ = rows;
+    result.cols_ = cols;
+    return result;
 }
 
 template <typename T>
 Matrix<T> Matrix<T>::horizontalConcat(const Matrix &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::horizontalConcat");
+    if (rows_ != rhs.rows_) {
+        throw DimensionMismatch(rows_, cols_, rhs.rows_, rhs.cols_);
+    }
+    Matrix result(rows_, cols_ + rhs.cols_);
+    result.setBlock(0, 0, *this);
+    result.setBlock(0, cols_, rhs);
+    return result;
 }
 
 template <typename T>
 Matrix<T> Matrix<T>::verticalConcat(const Matrix &rhs) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::verticalConcat");
+    if (cols_ != rhs.cols_) {
+        throw DimensionMismatch(rows_, cols_, rhs.rows_, rhs.cols_);
+    }
+    Matrix result(rows_ + rhs.rows_, cols_);
+    result.setBlock(0, 0, *this);
+    result.setBlock(rows_, 0, rhs);
+    return result;
 }
 
 template <typename T> Matrix<T> Matrix<T>::withoutRow(Index i) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::withoutRow");
+    if (i >= rows_) {
+        throw IndexOutOfRange(i, rows_);
+    }
+    Matrix result(rows_ - 1, cols_);
+    for (Index r = 0; r < rows_; ++r) {
+        if (r == i) {
+            continue;
+        }
+        // Rows past the dropped one shift up by one.
+        const Index dest = (r < i) ? r : r - 1;
+        for (Index c = 0; c < cols_; ++c) {
+            result(dest, c) = (*this)(r, c);
+        }
+    }
+    return result;
 }
 
 template <typename T> Matrix<T> Matrix<T>::withoutCol(Index j) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::withoutCol");
+    if (j >= cols_) {
+        throw IndexOutOfRange(j, cols_);
+    }
+    Matrix result(rows_, cols_ - 1);
+    for (Index c = 0; c < cols_; ++c) {
+        if (c == j) {
+            continue;
+        }
+        const Index dest = (c < j) ? c : c - 1;
+        for (Index r = 0; r < rows_; ++r) {
+            result(r, dest) = (*this)(r, c);
+        }
+    }
+    return result;
 }
 
 template <typename T> void Matrix<T>::transposeInPlace() {
-    throw LinalgError("not implemented: linalg::Matrix<T>::transposeInPlace");
+    if (isSquare()) {
+        // Square: swap across the diagonal, no allocation.
+        for (Index i = 0; i < rows_; ++i) {
+            for (Index j = i + 1; j < cols_; ++j) {
+                std::swap(storage_[linearIndex(i, j)],
+                          storage_[linearIndex(j, i)]);
+            }
+        }
+        return;
+    }
+    Matrix result = transpose();
+    swap(result);
 }
 
 template <typename T>
 void Matrix<T>::resize(Index rows,
                        Index cols) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::resize");
+    storage_.assign(rows * cols, T{});
+    rows_ = rows;
+    cols_ = cols;
 }
 
 template <typename T>
 void Matrix<T>::conservativeResize(Index rows,
                                    Index cols) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::conservativeResize");
+    throw LinalgError("not implemented: linalg::Matrix<T>::conservativeReSize");
+
+    /*// Row-major means growing the column count moves every row, so this
+    // rebuilds rather than resizing the buffer in place.
+    Matrix       result(rows, cols);
+    const Index  keptRows = (rows < rows_) ? rows : rows_;
+    const Index  keptCols = (cols < cols_) ? cols : cols_;
+    for (Index i = 0; i < keptRows; ++i) {
+        for (Index j = 0; j < keptCols; ++j) {
+            result(i, j) = (*this)(i, j);
+        }
+    }
+    swap(result); // growth stays zero-filled from result's construction*/
 }
 
 template <typename T>
 void Matrix<T>::swapRows(Index a,
                          Index b) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::swapRows");
+    if (a == b || isEmpty()) {
+        return;
+    }
+    // Row elements are adjacent in row-major storage, hence stride 1.
+    Kernels<T>::swap(cols_, &storage_[linearIndex(a, 0)], 1,
+                     &storage_[linearIndex(b, 0)], 1);
 }
 
 template <typename T>
 void Matrix<T>::swapCols(Index a,
                          Index b) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::swapCols");
+    if (a == b || isEmpty()) {
+        return;
+    }
+    // Down a column, consecutive elements are one row apart: stride cols_.
+    Kernels<T>::swap(rows_, &storage_[a], cols_, &storage_[b], cols_);
 }
 
 template <typename T> void Matrix<T>::fill(const T &value) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::fill");
+    std::fill(storage_.begin(), storage_.end(), value);
 }
 
 template <typename T> void Matrix<T>::setZero() {
-    throw LinalgError("not implemented: linalg::Matrix<T>::setZero");
+    std::fill(storage_.begin(), storage_.end(), T{});
 }
 
 template <typename T> void Matrix<T>::setIdentity() {
-    throw LinalgError("not implemented: linalg::Matrix<T>::setIdentity");
+    setZero();
+    const Index diagonalLength = (rows_ < cols_) ? rows_ : cols_;
+    for (Index k = 0; k < diagonalLength; ++k) {
+        (*this)(k, k) = T(1);
+    }
 }
 
 template <typename T> void Matrix<T>::swap(Matrix &other) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::swap");
+    std::swap(rows_, other.rows_);
+    std::swap(cols_, other.cols_);
+    storage_.swap(other.storage_);
 }
 
 // scalar summaries
 template <typename T> T Matrix<T>::trace() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::trace");
+    // A rectangular matrix has a main diagonal of min(rows, cols).
+    const Index diagonalLength = (rows_ < cols_) ? rows_ : cols_;
+    T           total          = T{};
+    for (Index k = 0; k < diagonalLength; ++k) {
+        total += (*this)(k, k);
+    }
+    return total;
 }
 
 template <typename T> T Matrix<T>::sum() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::sum");
+    T total = T{};
+    for (Index k = 0; k < size(); ++k) {
+        total += storage_[k];
+    }
+    return total;
 }
 
 template <typename T> T Matrix<T>::determinant() const {
@@ -594,20 +778,47 @@ template <typename T> T Matrix<T>::determinant() const {
 }
 
 template <typename T> typename Matrix<T>::Real Matrix<T>::oneNorm() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::oneNorm");
+    if (isEmpty()) {
+        return Real{};
+    }
+    Real best = Real{};
+    for (Index j = 0; j < cols_; ++j) {
+        const Real columnSum = Kernels<T>::asum(rows_, &storage_[j], cols_);
+        if (columnSum > best) {
+            best = columnSum;
+        }
+    }
+    return best;
 }
 
 template <typename T> typename Matrix<T>::Real Matrix<T>::infinityNorm() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::infinityNorm");
+    if (isEmpty()) {
+        return Real{};
+    }
+    Real best = Real{};
+    for (Index i = 0; i < rows_; ++i) {
+        const Real rowSum =
+            Kernels<T>::asum(cols_, &storage_[linearIndex(i, 0)], 1);
+        if (rowSum > best) {
+            best = rowSum;
+        }
+    }
+    return best;
 }
 
 template <typename T>
 typename Matrix<T>::Real Matrix<T>::frobeniusNorm() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::frobeniusNorm");
+    // The Frobenius norm is the 2-norm of the flattened buffer, so nrm2
+    // covers it directly
+    return Kernels<T>::nrm2(size(), storage_.data(), 1);
 }
 
 template <typename T> typename Matrix<T>::Real Matrix<T>::maxNorm() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::maxNorm");
+    if (isEmpty()) {
+        return Real{};
+    }
+    const Index k = Kernels<T>::iamax(size(), storage_.data(), 1);
+    return NumericTraits<T>::abs(storage_[k]);
 }
 
 template <typename T> typename Matrix<T>::Real Matrix<T>::spectralNorm() const {
@@ -626,35 +837,111 @@ typename Matrix<T>::Index Matrix<T>::rank(Real tolerance) const {
 
 // predicates
 template <typename T> bool Matrix<T>::isSymmetric(Real tolerance) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::isSymmetric");
+    if (!isSquare()) {
+        return false; // a rectangular matrix cannot equal its transpose
+    }
+    // Compares against the transpose without forming it; only the strictly
+    // upper triangle is walked, since the diagonal matches itself.
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = i + 1; j < cols_; ++j) {
+            if (!NumericTraits<T>::isApproxZero((*this)(i, j) - (*this)(j, i),
+                                                tolerance)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 template <typename T> bool Matrix<T>::isHermitian(Real tolerance) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::isHermitian");
+    if (!isSquare()) {
+        return false;
+    }
+    for (Index i = 0; i < rows_; ++i) {
+        // A Hermitian diagonal is real, so the diagonal is a genuine test
+        // here rather than the tautology it is for isSymmetric.
+        if (!NumericTraits<T>::isApproxZero(
+                (*this)(i, i) - NumericTraits<T>::conj((*this)(i, i)),
+                tolerance)) {
+            return false;
+        }
+        for (Index j = i + 1; j < cols_; ++j) {
+            if (!NumericTraits<T>::isApproxZero(
+                    (*this)(i, j) - NumericTraits<T>::conj((*this)(j, i)),
+                    tolerance)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 template <typename T> bool Matrix<T>::isDiagonal(Real tolerance) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::isDiagonal");
+    // No square requirement: a rectangular matrix is diagonal when
+    // everything off the main diagonal is negligible.
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            if (i != j &&
+                !NumericTraits<T>::isApproxZero((*this)(i, j), tolerance)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 template <typename T>
 bool Matrix<T>::isTriangular(Triangle::Kind which,
                              Real           tolerance) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::isTriangular");
+    // `which` names the triangle allowed to hold data, so the test is that
+    // the opposite one vanishes. The diagonal belongs to both and is
+    // never checked.
+    const bool upper = (which == Triangle::Kind::Upper);
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            const bool mustVanish = upper ? (i > j) : (i < j);
+            if (mustVanish &&
+                !NumericTraits<T>::isApproxZero((*this)(i, j), tolerance)) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 template <typename T> bool Matrix<T>::isOrthogonal(Real tolerance) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::isOrthogonal");
+    // A^H A == I. For a tall matrix this is the columns-orthonormal test,
+    // which is why the identity is sized by cols_ rather than rows_.
+    const Matrix gram = conjugateTranspose() * (*this);
+    return gram.isApprox(Identity(cols_), tolerance);
 }
 
 template <typename T>
 bool Matrix<T>::isApprox(const Matrix &other,
                          Real          tolerance) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::isApprox");
+    // A shape mismatch is a false result, not an error: this is the
+    // tolerant counterpart to operator==, which also just returns false.
+    if (rows_ != other.rows_ || cols_ != other.cols_) {
+        return false;
+    }
+    for (Index k = 0; k < size(); ++k) {
+        // isApproxZero(x, tol) is |x| <= tol; works for complex T too.
+        if (!NumericTraits<T>::isApproxZero(storage_[k] - other.storage_[k],
+                                            tolerance)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 template <typename T> bool Matrix<T>::hasNaN() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::hasNaN");
+    for (const T &value : storage_) {
+        if (std::isnan(NumericTraits<T>::real(value)) ||
+            std::isnan(NumericTraits<T>::imag(value))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // derived matrices
@@ -681,7 +968,34 @@ template <typename T> Matrix<T> Matrix<T>::skewSymmetricPart() const {
 
 // serialization
 template <typename T> std::string Matrix<T>::toString(int precision) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::toString");
+
+    std::vector<std::string> cells(size());
+    std::size_t              width = 0;
+    for (Index k = 0; k < size(); ++k) {
+        std::ostringstream cell;
+        // std::complex carries its own operator<<, so real and complex T
+        // both format through this one path.
+        cell << std::setprecision(precision) << storage_[k];
+        cells[k] = cell.str();
+        if (cells[k].size() > width) {
+            width = cells[k].size();
+        }
+    }
+
+    std::ostringstream out;
+    for (Index i = 0; i < rows_; ++i) {
+        if (i > 0) {
+            out << '\n'; // separator, not terminator: no trailing newline
+        }
+        for (Index j = 0; j < cols_; ++j) {
+            if (j > 0) {
+                out << ' ';
+            }
+            out << std::setw(static_cast<int>(width))
+                << cells[linearIndex(i, j)];
+        }
+    }
+    return out.str();
 }
 
 template <typename T> std::string Matrix<T>::toMatlabLiteral() const {
@@ -718,7 +1032,9 @@ void Matrix<T>::checkBounds(Index i,
 
 template <typename T>
 void Matrix<T>::checkSameShape(const Matrix &other) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::checkSameShape");
+    if (rows_ != other.rows_ || cols_ != other.cols_) {
+        throw DimensionMismatch(rows_, cols_, other.rows_, other.cols_);
+    }
 }
 
 // Explicit instantiation. Every scalar the library ships is
