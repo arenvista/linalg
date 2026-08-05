@@ -125,17 +125,34 @@ template <typename T>
 TriangularSolver<T>::TriangularSolver(const Options &options)
     : options_(options) {}
 
+<<<<<<< HEAD
 template <typename T>
 Vector<T> TriangularSolver<T>::solve(const Matrix<T> &a,
                                      const Vector<T> &b) const {
     Vector<T> x = b;
     solveInPlace(a, x);
     return x;
+=======
+// TODO: Check implementation (reference:
+// https://mathweb.ucsd.edu/~dumitriu/chapter1p3.pdf)
+template <typename T>
+Vector<T> TriangularSolver<T>::solve(const Matrix<T> &a,
+                                     const Vector<T> &b) const {
+    std::vector<T> res = {};
+    for (Index i = 0; i < a.rows(); i++) {
+        for (Index j = 0; j < a.cols(); j++) {
+            T cell = b(i) - a(i, j) * b(i);
+            res.push_back(cell);
+        }
+    }
+    return Vector(res);
+>>>>>>> 9c3e9c8 (started trig solve)
 }
 
 template <typename T>
 Matrix<T> TriangularSolver<T>::solve(const Matrix<T> &a,
                                      const Matrix<T> &b) const {
+<<<<<<< HEAD
     Matrix<T> x = b;
     solveInPlace(a, x);
     return x;
@@ -145,10 +162,14 @@ template <typename T>
 void TriangularSolver<T>::solveInPlace(const Matrix<T> &a,
                                        Vector<T>       &b) const {
     substitute(a, b, options_.uplo, options_.diagonal, options_.transposition);
+=======
+    throw LinalgError("not implemented: linalg::TriangularSolver<T>::solve");
+>>>>>>> 9c3e9c8 (started trig solve)
 }
 
 template <typename T>
 void TriangularSolver<T>::solveInPlace(const Matrix<T> &a,
+<<<<<<< HEAD
                                        Matrix<T>       &b) const {
     if (a.rows() != a.cols() || a.cols() != b.rows()) {
         throw DimensionMismatch(a.rows(), a.cols(), b.rows(), b.cols());
@@ -194,11 +215,37 @@ TriangularSolver<T>::reciprocalConditionEstimate(const Matrix<T> &a) const {
         return Real(0);
     }
     return Real(1) / (normA * normInv);
+=======
+                                       Vector<T>       &b) const {
+    throw LinalgError(
+        "not implemented: linalg::TriangularSolver<T>::solveInPlace");
+}
+
+template <typename T>
+void TriangularSolver<T>::solveInPlace(const Matrix<T> &a,
+                                       Matrix<T>       &b) const {
+    throw LinalgError(
+        "not implemented: linalg::TriangularSolver<T>::solveInPlace");
+}
+
+template <typename T>
+Matrix<T> TriangularSolver<T>::inverse(const Matrix<T> &a) const {
+    throw LinalgError("not implemented: linalg::TriangularSolver<T>::inverse");
+}
+
+template <typename T>
+typename TriangularSolver<T>::Real
+TriangularSolver<T>::reciprocalConditionEstimate(const Matrix<T> &a) const {
+    throw LinalgError(
+        "not implemented: "
+        "linalg::TriangularSolver<T>::reciprocalConditionEstimate");
+>>>>>>> 9c3e9c8 (started trig solve)
 }
 
 template <typename T>
 bool TriangularSolver<T>::isNonsingular(const Matrix<T> &a,
                                         Real             tolerance) const {
+<<<<<<< HEAD
     // A unit diagonal is an implied all-ones diagonal, always nonsingular.
     if (options_.diagonal == Diagonal::Kind::Unit) {
         return true;
@@ -210,6 +257,10 @@ bool TriangularSolver<T>::isNonsingular(const Matrix<T> &a,
         }
     }
     return true;
+=======
+    throw LinalgError(
+        "not implemented: linalg::TriangularSolver<T>::isNonsingular");
+>>>>>>> 9c3e9c8 (started trig solve)
 }
 
 // Explicit instantiation. Every scalar the library ships is
