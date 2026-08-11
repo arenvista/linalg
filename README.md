@@ -111,14 +111,14 @@ Status key: `[ ]` not started · `[o]` in progress · `[x]` done.
 | `[x]`  | Kernels     | `src/ops/Kernels.cpp`     | `@aren` | naive gemm/level 1-2; reroute `Matrix::operator*`       |
 | `[x]`  | Norm        | `src/ops/Norm.cpp`        | `@aren` | `vectorTwoScaled`; `matrixTwo`/`matrixNuclear` deferred |
 | `[x]`  | Householder | `src/ops/Householder.cpp` | `@aren` | —                                                       |
-| `[o]`  | Givens      | `src/ops/Givens.cpp`      | `@aren` | —                                                       |
+| `[x]`  | Givens      | `src/ops/Givens.cpp`      | `@aren` | —                                                       |
 
 ### Phase 2 — Triangular solves and first factorizations
 
 | Status | Component        | File                             | Owner   | Notes                                                |
 | ------ | ---------------- | -------------------------------- | ------- | ---------------------------------------------------- |
-| `[ ]`  | TriangularSolver | `src/solve/TriangularSolver.cpp` | `@____` | —                                                    |
-| `[ ]`  | LU               | `src/decomp/LU.cpp`              | `@____` | + `FullPivLU`                                        |
+| `[x]`  | TriangularSolver | `src/solve/TriangularSolver.cpp` | `@aren` | —                                                    |
+| `[ ]`  | LU               | `src/decomp/LU.cpp`              | `@dom`  | + `FullPivLU`                                        |
 | `[ ]`  | Cholesky         | `src/decomp/Cholesky.cpp`        | `@____` | + `LDLT`                                             |
 | `[ ]`  | QR               | `src/decomp/QR.cpp`              | `@____` | + `ColPivQR`, `GramSchmidt`                          |
 | `[ ]`  | Back-fill Matrix | `src/core/Matrix.cpp`            | `@____` | `determinant`, `inverse`, `rank`, `RandomOrthogonal` |

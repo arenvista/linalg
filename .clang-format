@@ -1,60 +1,219 @@
 # Style used by clang-format, which is what clangd runs when it formats a
-# document or on save. Based on LLVM so the existing layout is preserved;
-# the indentation width is widened to four spaces and a handful of LLVM
-# defaults are pinned explicitly so formatting stays stable across
-# clang-format versions and reads as a deliberate choice rather than an
-# inherited one. Every option below either matches the current LLVM default
-# or is one this codebase already follows, so adopting it reformats nothing.
+# document or on save. Based on LLVM, with the indentation widened to four
+# spaces and a set of options pinned explicitly so formatting stays stable
+# across clang-format versions and reads as a deliberate choice rather than
+# an inherited one.
+#
+# NOTE: this config is NOT a no-op against stock LLVM. The AlignConsecutive*
+# family, BinPackParameters, and the short-statement rules all differ from
+# LLVM defaults. Adopting it will reformat the tree, so land the reflow as a
+# single mechanical commit and add that SHA to .git-blame-ignore-revs.
+#
+# Requires clang-format >= 20 (BinPackParameters became an enum in 20; the
+# KeepEmptyLines struct landed in 19).
+
 Language: Cpp
+
 BasedOnStyle: LLVM
 
-# The library targets C++17 (see target_compile_features in CMakeLists.txt).
-# Telling clang-format the language level makes it parse constructs such as
-# nested `>>` in templates and `if constexpr` the way the compiler does.
-Standard: c++17
+# Language level. clang-format needs this to parse `if constexpr`, nested
+# `>>` in template argument lists, and — at c++20 — concepts and requires
+# clauses. Set this to match target_compile_features in CMakeLists.txt: if
+# the library is built as cxx_std_20, leave this as c++20, otherwise drop it
+# back to c++17 and delete the "Concepts and requires clauses" block below.
+Standard: c++20
 
-# Indentation: four spaces, never tabs. This is the one place the layout
-# departs from stock LLVM (which uses two).
+# ---------------------------------------------------------------------------
+# Indentation
+# ---------------------------------------------------------------------------
+
+# Four spaces, never tabs. This is the one place the layout departs from
+# stock LLVM (which uses two).
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
 ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
 
-# Line width. 80 is the LLVM default; pinned so it is never inherited
-# silently or changed out from under the sources.
+# Must track IndentWidth. LLVM ships -2 to pair with its 2-space indent;
+# leaving it at -2 alongside IndentWidth: 4 lands `public:` two columns
+# inside the class body instead of flush with `class`. -4 restores the
+# intended "access specifiers sit at the class's own indent level".
+AccessModifierOffset: -4
+
+# Indent inside #if / #ifdef nesting rather than jamming every directive to
+# column 0. Keeps conditional-compilation blocks in headers readable.
+IndentPPDirectives: AfterHash
+
+IndentCaseLabels: false
+NamespaceIndentation: None
+
+# ---------------------------------------------------------------------------
+# Line width and line endings
+# ---------------------------------------------------------------------------
+
 ColumnLimit: 80
+LineEnding: LF
+InsertNewlineAtEOF: true
+MaxEmptyLinesToKeep: 1
 
-# Pointers and references bind to the name, matching `T *data` and
-# `const MatrixView &other` throughout the sources.
+# ---------------------------------------------------------------------------
+# Pointers, references, qualifiers
+# ---------------------------------------------------------------------------
+
+# Bind to the name, matching `T *data` and `const MatrixView &other`
+# throughout the sources. DerivePointerAlignment must be false or
+# clang-format infers the style per-file from whatever is already there,
+# which defeats the point of pinning it.
 PointerAlignment: Right
 ReferenceAlignment: Pointer
+DerivePointerAlignment: false
 
-# Break `template <...>` onto its own line only when the entity it introduces
-# spans multiple lines, so `template <typename T> class Matrix;` forward
-# declarations stay on one line while function and class definitions break.
-AlwaysBreakTemplateDeclarations: MultiLine
+# Left ("const T") vs. Right ("T const") is left alone deliberately. The docs
+# flag QualifierAlignment as not guaranteed to be idempotent, and it is known
+# to mangle qualifiers in heavily templated code. If you want const-placement
+# uniformity, enforce it with clang-tidy's readability-const-return-type /
+# a review convention rather than the formatter.
+QualifierAlignment: Leave
+
+# ---------------------------------------------------------------------------
+# Templates and concepts
+# ---------------------------------------------------------------------------
+
+# `template <...>` breaks onto its own line only when the entity it
+# introduces spans multiple lines, so `template <typename T> class Matrix;`
+# forward declarations stay on one line while definitions break.
+# (Renamed from AlwaysBreakTemplateDeclarations in clang-format 19; the old
+# spelling still works as an alias but is no longer the documented name.)
+BreakTemplateDeclarations: MultiLine
 SpaceAfterTemplateKeyword: true
 
-# Includes are sorted within each block, but existing blank-line-separated
-# groups are kept as written (own header / project / <system>, and the
-# subsystem groupings in the linalg.hpp umbrella header). Preserve avoids
-# collapsing those intentional groups into one flat list.
+# Concepts and requires clauses. Delete this block if Standard is c++17.
+BreakBeforeConceptDeclarations: Always
+RequiresClausePosition: OwnLine
+IndentRequiresClause: false
+RequiresExpressionIndentation: OuterScope
+
+# ---------------------------------------------------------------------------
+# Includes
+# ---------------------------------------------------------------------------
+
+# Sorted within each block, but existing blank-line-separated groups are kept
+# as written (own header / project / <system>, and the subsystem groupings in
+# the linalg.hpp umbrella header). Preserve avoids collapsing those
+# intentional groups into one flat list.
+#
+# If you later want the grouping itself enforced rather than merely
+# preserved, switch to IncludeBlocks: Regroup with explicit IncludeCategories
+# and wrap the umbrella header's body in // clang-format off / on.
 SortIncludes: CaseSensitive
 IncludeBlocks: Preserve
+SortUsingDeclarations: LexicographicNumeric
 
+# ---------------------------------------------------------------------------
+# Argument and parameter packing
+# ---------------------------------------------------------------------------
 
-AlignConsecutiveAssignments: true
-AllowShortIfStatementsOnASingleLine: WithoutElse
-AlignConsecutiveMacros: Consecutive
-AlignConsecutiveDeclarations: Consecutive
-AlignConsecutiveTableGenDefinitionColons: Consecutive
-AlignEscapedNewlines: Left
-AlignOperands: true
-AlignTrailingComments: true
-
-# Put each function parameter and each constructor initializer on its own
-# line (rather than bin-packing several per line). Combined with
-# AlignConsecutiveDeclarations above, the parameter names line up in a
-# column, and the initializers stack under one another after the colon.
+# Each function parameter on its own line, never bin-packed. BinPackArguments
+# must match or declarations and their call sites disagree: parameters would
+# stack one-per-line while the corresponding calls packed several per line.
 BinPackParameters: AlwaysOnePerLine
+BinPackArguments: false
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+
+# BlockIndent pairs with one-per-line: the parameter list is indented one
+# level under the open paren and the closing paren gets its own line, instead
+# of aligning parameters against the paren column. At 80 columns with names
+# like `MatrixView<std::complex<double>>` the aligned form runs out of room
+# almost immediately.
+AlignAfterOpenBracket: BlockIndent
+
+# Each constructor initializer on its own line, stacked under the colon.
 PackConstructorInitializers: Never
+BreakConstructorInitializers: BeforeColon
+
+# LLVM's default penalty of 60 makes clang-format hoist long template return
+# types onto their own line, so some signatures break after the return type
+# and others break in the parameter list. Raising it keeps the return type
+# with the function name and pushes all breaking into the parameter list,
+# which is where the one-per-line rule already puts it.
+PenaltyReturnTypeOnItsOwnLine: 1000
+
+# ---------------------------------------------------------------------------
+# Alignment
+# ---------------------------------------------------------------------------
+
+# Column alignment across consecutive lines. This is the most opinionated
+# part of the config: it looks tidy, but any rename that changes a type or
+# identifier length reflows the whole aligned run, so diffs pick up lines
+# that did not otherwise change. If review noise starts to bite, the two to
+# drop first are AlignConsecutiveDeclarations and AlignConsecutiveAssignments
+# (set them to None); the macro one is comparatively cheap.
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveMacros: Consecutive
+AlignConsecutiveBitFields: Consecutive
+
+AlignEscapedNewlines: Left
+AlignOperands: Align
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+
+# ---------------------------------------------------------------------------
+# Braces and short statements
+# ---------------------------------------------------------------------------
+
+# Braces on every control statement, always. This is the single biggest
+# uniformity win available, and it also removes the class of bug where a
+# second statement gets appended under an unbraced `if`.
+#
+# InsertBraces is one of two options here that edit code rather than
+# whitespace (RemoveSemicolon is the other). Both are documented as possibly
+# non-idempotent in the presence of macros — run the initial reflow twice and
+# diff, and drop either one if it misbehaves on the macro-heavy headers.
+InsertBraces: true
+RemoveSemicolon: true
+
+# With braces mandatory, single-line forms have to go too, or the result is
+# `if (x) { return; }` on one line next to a three-line `for` right below it.
+# Never across the board is the coherent pairing.
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+
+# Trivial accessors defined inside a class stay on one line
+# (`size_type rows() const { return rows_; }`), but out-of-line definitions
+# always get a full body. LLVM's default of All allows both forms anywhere,
+# which is where the inconsistency in the current sources comes from.
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortEnumsOnASingleLine: false
+AllowShortLambdasOnASingleLine: All
+
+BreakBeforeBraces: Attach
+Cpp11BracedListStyle: true
+
+# ---------------------------------------------------------------------------
+# Blank lines and comments
+# ---------------------------------------------------------------------------
+
+# One blank line between top-level definitions, inserted if missing. Stops
+# the density of a file depending on who last touched it.
+SeparateDefinitionBlocks: Always
+
+KeepEmptyLines:
+  AtEndOfFile: false
+  AtStartOfBlock: false
+  AtStartOfFile: false
+
+EmptyLineBeforeAccessModifier: LogicalBlock
+EmptyLineAfterAccessModifier: Never
+
+FixNamespaceComments: true
+ShortNamespaceLines: 1
+ReflowComments: true
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: -1
