@@ -1,5 +1,6 @@
 #include "linalg/decomp/Cholesky.hpp"
 
+#include <cmath>
 #include <utility>
 
 #include "linalg/Instantiate.hpp"
@@ -39,7 +40,9 @@ Cholesky<T>::Cholesky(const Matrix<T> &a)
       ),
       computed_(false),
       positiveDefinite_(false),
-      failedPivot_(0) {}
+      failedPivot_(0) {
+    compute(a);
+}
 
 template <typename T>
 Cholesky<T>::Cholesky(
@@ -50,7 +53,9 @@ Cholesky<T>::Cholesky(
       options_(options),
       computed_(false),
       positiveDefinite_(false),
-      failedPivot_(0) {}
+      failedPivot_(0) {
+    compute(a);
+}
 
 template <typename T> void Cholesky<T>::compute(const Matrix<T> &a) {
     if (!a.isSquare()) {
@@ -108,21 +113,23 @@ template <typename T> void Cholesky<T>::compute(const Matrix<T> &a) {
 }
 
 template <typename T> bool Cholesky<T>::isComputed() const {
-    throw LinalgError("not implemented: linalg::Cholesky<T>::isComputed");
+    return computed_;
 }
 
 template <typename T> bool Cholesky<T>::isPositiveDefinite() const {
-    throw LinalgError(
-        "not implemented: linalg::Cholesky<T>::isPositiveDefinite"
-    );
+    return computed_ && positiveDefinite_;
 }
 
 template <typename T> Matrix<T> Cholesky<T>::lower() const {
-    throw LinalgError("not implemented: linalg::Cholesky<T>::lower");
+    return options_.readFrom == Triangle::Kind::Lower
+               ? factor_
+               : factor_.conjugateTranspose();
 }
 
 template <typename T> Matrix<T> Cholesky<T>::upper() const {
-    throw LinalgError("not implemented: linalg::Cholesky<T>::upper");
+    return options_.readFrom == Triangle::Kind::Lower
+               ? factor_.conjugateTranspose()
+               : factor_;
 }
 
 template <typename T> Vector<T> Cholesky<T>::solve(const Vector<T> &b) const {
@@ -221,14 +228,39 @@ template <typename T> T Cholesky<T>::determinant() const {
 
 template <typename T>
 typename Cholesky<T>::Real Cholesky<T>::logDeterminant() const {
-    throw LinalgError("not implemented: linalg::Cholesky<T>::logDeterminant");
+    if (!computed_ || !positiveDefinite_) {
+        throw NotComputed("Cholesky");
+    }
+    // det(A) = det(L) det(L^H) = prod_j L(j,j)^2; the L(j,j) are real and
+    // positive, so the product is real and positive too.
+    Cholesky<T>::Real det = 0;
+    for (Index j = 0; j < factor_.rows(); ++j) {
+        det += 2 * std::log(NumericTraits<T>::real(factor_(j, j)));
+    }
+    return det;
 }
 
 template <typename T>
 typename Cholesky<T>::Real Cholesky<T>::reciprocalConditionEstimate() const {
-    throw LinalgError(
-        "not implemented: linalg::Cholesky<T>::reciprocalConditionEstimate"
-    );
+    if (!computed_ || !positiveDefinite_) {
+        throw NotComputed("Cholesky");
+    }
+
+    // A = L L^H gives cond_2(A) = cond_2(L)^2, so rcond(A) ~ rcond(L)^2. Reuse
+    // the triangular solver's cheap 1-norm estimate on the lower factor; the
+    // result lies in (0, 1] because L is nonsingular for a positive-definite A.
+    using Solver = TriangularSolver<T>;
+
+    const typename Solver::Options lower{
+        Triangle::Kind::Lower,
+        Diagonal::Kind::NonUnit,
+        Transposition::Kind::None,
+        false,
+        0
+    };
+
+    const Real rcondL = Solver(lower).reciprocalConditionEstimate(factor_);
+    return rcondL * rcondL;
 }
 
 template <typename T> void Cholesky<T>::update(const Vector<T> &x) {

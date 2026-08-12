@@ -11,33 +11,39 @@
 namespace linalg {
 
 template <typename T>
-void Kernels<T>::scal(Index    n,
-                      const T &alpha,
-                      T       *x,
-                      Index    incx) {
+void Kernels<T>::scal(
+    Index    n,
+    const T &alpha,
+    T       *x,
+    Index    incx
+) {
     for (Index i = 0; i < n; ++i) {
         x[i * incx] *= alpha;
     }
 }
 
 template <typename T>
-void Kernels<T>::axpy(Index    n,
-                      const T &alpha,
-                      const T *x,
-                      Index    incx,
-                      T       *y,
-                      Index    incy) {
+void Kernels<T>::axpy(
+    Index    n,
+    const T &alpha,
+    const T *x,
+    Index    incx,
+    T       *y,
+    Index    incy
+) {
     for (Index i = 0; i < n; ++i) {
         y[i * incy] += alpha * x[i * incx];
     }
 }
 
 template <typename T>
-T Kernels<T>::dot(Index    n,
-                  const T *x,
-                  Index    incx,
-                  const T *y,
-                  Index    incy) {
+T Kernels<T>::dot(
+    Index    n,
+    const T *x,
+    Index    incx,
+    const T *y,
+    Index    incy
+) {
     T result = T{};
     for (Index i = 0; i < n; ++i) {
         result += y[i * incy] * x[i * incx];
@@ -46,11 +52,13 @@ T Kernels<T>::dot(Index    n,
 }
 
 template <typename T>
-T Kernels<T>::dotc(Index    n,
-                   const T *x,
-                   Index    incx,
-                   const T *y,
-                   Index    incy) {
+T Kernels<T>::dotc(
+    Index    n,
+    const T *x,
+    Index    incx,
+    const T *y,
+    Index    incy
+) {
     T result = T{};
     for (Index i = 0; i < n; ++i) {
         result += NumericTraits<T>::conj(x[i * incx]) * y[i * incy];
@@ -59,9 +67,11 @@ T Kernels<T>::dotc(Index    n,
 }
 
 template <typename T>
-typename Kernels<T>::Real Kernels<T>::nrm2(Index    n,
-                                           const T *x,
-                                           Index    incx) {
+typename Kernels<T>::Real Kernels<T>::nrm2(
+    Index    n,
+    const T *x,
+    Index    incx
+) {
     // Overflow-safe scaling (BLAS nrm2): factor out the running maximum
     // magnitude so |x_i|^2 is never formed directly.
     Real scale = Real{};
@@ -83,9 +93,11 @@ typename Kernels<T>::Real Kernels<T>::nrm2(Index    n,
 }
 
 template <typename T>
-typename Kernels<T>::Real Kernels<T>::asum(Index    n,
-                                           const T *x,
-                                           Index    incx) {
+typename Kernels<T>::Real Kernels<T>::asum(
+    Index    n,
+    const T *x,
+    Index    incx
+) {
     Real sum = Real{};
     for (Index i = 0; i < n; ++i) {
         sum += NumericTraits<T>::abs(x[i * incx]);
@@ -94,9 +106,11 @@ typename Kernels<T>::Real Kernels<T>::asum(Index    n,
 }
 
 template <typename T>
-typename Kernels<T>::Index Kernels<T>::iamax(Index    n,
-                                             const T *x,
-                                             Index    incx) {
+typename Kernels<T>::Index Kernels<T>::iamax(
+    Index    n,
+    const T *x,
+    Index    incx
+) {
     if (n == 0) {
         return 0; // BLAS convention for n < 1; also avoids reading x[0]
     }
@@ -113,36 +127,42 @@ typename Kernels<T>::Index Kernels<T>::iamax(Index    n,
 }
 
 template <typename T>
-void Kernels<T>::swap(Index n,
-                      T    *x,
-                      Index incx,
-                      T    *y,
-                      Index incy) {
+void Kernels<T>::swap(
+    Index n,
+    T    *x,
+    Index incx,
+    T    *y,
+    Index incy
+) {
     for (Index i = 0; i < n; ++i) {
         std::swap(x[i * incx], y[i * incy]);
     }
 }
 
 template <typename T>
-void Kernels<T>::copy(Index    n,
-                      const T *x,
-                      Index    incx,
-                      T       *y,
-                      Index    incy) {
+void Kernels<T>::copy(
+    Index    n,
+    const T *x,
+    Index    incx,
+    T       *y,
+    Index    incy
+) {
     for (Index i = 0; i < n; ++i) {
         y[i * incy] = x[i * incx];
     }
 }
 
 template <typename T>
-void Kernels<T>::gemv(Transposition::Kind       trans,
-                      const T                  &alpha,
-                      const ConstMatrixView<T> &a,
-                      const T                  *x,
-                      Index                     incx,
-                      const T                  &beta,
-                      T                        *y,
-                      Index                     incy) {
+void Kernels<T>::gemv(
+    Transposition::Kind       trans,
+    const T                  &alpha,
+    const ConstMatrixView<T> &a,
+    const T                  *x,
+    Index                     incx,
+    const T                  &beta,
+    T                        *y,
+    Index                     incy
+) {
     const bool transposed = (trans != Transposition::Kind::None);
     const bool conjugate  = (trans == Transposition::Kind::ConjugateTranspose);
 
@@ -170,12 +190,14 @@ void Kernels<T>::gemv(Transposition::Kind       trans,
 }
 
 template <typename T>
-void Kernels<T>::ger(const T      &alpha,
-                     const T      *x,
-                     Index         incx,
-                     const T      *y,
-                     Index         incy,
-                     MatrixView<T> a) {
+void Kernels<T>::ger(
+    const T      &alpha,
+    const T      *x,
+    Index         incx,
+    const T      *y,
+    Index         incy,
+    MatrixView<T> a
+) {
     // Unconjugated rank-one update: a(i,j) += alpha * x[i] * y[j].
     const Index rows = a.rows();
     const Index cols = a.cols();
@@ -188,12 +210,14 @@ void Kernels<T>::ger(const T      &alpha,
 }
 
 template <typename T>
-void Kernels<T>::trsv(Triangle::Kind            uplo,
-                      Transposition::Kind       trans,
-                      Diagonal::Kind            diag,
-                      const ConstMatrixView<T> &a,
-                      T                        *x,
-                      Index                     incx) {
+void Kernels<T>::trsv(
+    Triangle::Kind            uplo,
+    Transposition::Kind       trans,
+    Diagonal::Kind            diag,
+    const ConstMatrixView<T> &a,
+    T                        *x,
+    Index                     incx
+) {
     const bool  transposed = (trans != Transposition::Kind::None);
     const bool  conjugate  = (trans == Transposition::Kind::ConjugateTranspose);
     const bool  unit       = (diag == Diagonal::Kind::Unit);
@@ -241,14 +265,16 @@ void Kernels<T>::trsv(Triangle::Kind            uplo,
 }
 
 template <typename T>
-void Kernels<T>::symv(Triangle::Kind            uplo,
-                      const T                  &alpha,
-                      const ConstMatrixView<T> &a,
-                      const T                  *x,
-                      Index                     incx,
-                      const T                  &beta,
-                      T                        *y,
-                      Index                     incy) {
+void Kernels<T>::symv(
+    Triangle::Kind            uplo,
+    const T                  &alpha,
+    const ConstMatrixView<T> &a,
+    const T                  *x,
+    Index                     incx,
+    const T                  &beta,
+    T                        *y,
+    Index                     incy
+) {
     const Index n = a.rows();
 
     // Symmetric (not Hermitian): the untouched triangle mirrors the stored
@@ -275,16 +301,20 @@ void Kernels<T>::symv(Triangle::Kind            uplo,
 }
 
 template <typename T>
-void Kernels<T>::gemm(Transposition::Kind       transA,
-                      Transposition::Kind       transB,
-                      const T                  &alpha,
-                      const ConstMatrixView<T> &a,
-                      const ConstMatrixView<T> &b,
-                      const T                  &beta,
-                      MatrixView<T>             c) {
+void Kernels<T>::gemm(
+    Transposition::Kind       transA,
+    Transposition::Kind       transB,
+    const T                  &alpha,
+    const ConstMatrixView<T> &a,
+    const ConstMatrixView<T> &b,
+    const T                  &beta,
+    MatrixView<T>             c
+) {
     // op(m) element at logical (i, j): m, m^T, or m^H.
-    const auto op = [](const ConstMatrixView<T> &m, Transposition::Kind t,
-                       Index i, Index j) -> T {
+    const auto op = [](const ConstMatrixView<T> &m,
+                       Transposition::Kind       t,
+                       Index                     i,
+                       Index                     j) -> T {
         if (t == Transposition::Kind::None) {
             return m(i, j);
         }
@@ -316,12 +346,14 @@ void Kernels<T>::gemm(Transposition::Kind       transA,
 }
 
 template <typename T>
-void Kernels<T>::syrk(Triangle::Kind            uplo,
-                      Transposition::Kind       trans,
-                      const T                  &alpha,
-                      const ConstMatrixView<T> &a,
-                      const T                  &beta,
-                      MatrixView<T>             c) {
+void Kernels<T>::syrk(
+    Triangle::Kind            uplo,
+    Transposition::Kind       trans,
+    const T                  &alpha,
+    const ConstMatrixView<T> &a,
+    const T                  &beta,
+    MatrixView<T>             c
+) {
     // op(a) is a (None) or a^H (ConjugateTranspose); result c = alpha *
     // op(a) * op(a)^H + beta * c, writing only the `uplo` triangle.
     const bool  conjugate = (trans != Transposition::Kind::None);
@@ -351,12 +383,14 @@ void Kernels<T>::syrk(Triangle::Kind            uplo,
 }
 
 template <typename T>
-void Kernels<T>::trsm(Triangle::Kind            uplo,
-                      Transposition::Kind       trans,
-                      Diagonal::Kind            diag,
-                      const T                  &alpha,
-                      const ConstMatrixView<T> &a,
-                      MatrixView<T>             b) {
+void Kernels<T>::trsm(
+    Triangle::Kind            uplo,
+    Transposition::Kind       trans,
+    Diagonal::Kind            diag,
+    const T                  &alpha,
+    const ConstMatrixView<T> &a,
+    MatrixView<T>             b
+) {
     // b <- alpha * op(a)^-1 * b: solve op(a) X = alpha * b for each column,
     // reusing the trsv substitution structure.
     const bool  transposed = (trans != Transposition::Kind::None);
@@ -411,22 +445,28 @@ typename Kernels<T>::BlockSizes Kernels<T>::tunedBlockSizes() {
 }
 
 template <typename T>
-void Kernels<T>::packPanelA(const ConstMatrixView<T> &a,
-                            T                        *buffer) {
+void Kernels<T>::packPanelA(
+    const ConstMatrixView<T> &a,
+    T                        *buffer
+) {
     throw LinalgError("not implemented: linalg::Kernels<T>::packPanelA");
 }
 
 template <typename T>
-void Kernels<T>::packPanelB(const ConstMatrixView<T> &b,
-                            T                        *buffer) {
+void Kernels<T>::packPanelB(
+    const ConstMatrixView<T> &b,
+    T                        *buffer
+) {
     throw LinalgError("not implemented: linalg::Kernels<T>::packPanelB");
 }
 
 template <typename T>
-void Kernels<T>::microKernel(Index         kc,
-                             const T      *packedA,
-                             const T      *packedB,
-                             MatrixView<T> c) {
+void Kernels<T>::microKernel(
+    Index         kc,
+    const T      *packedA,
+    const T      *packedB,
+    MatrixView<T> c
+) {
     throw LinalgError("not implemented: linalg::Kernels<T>::microKernel");
 }
 

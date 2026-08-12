@@ -26,8 +26,10 @@ Householder<T>::Householder()
       beta_(0) {}
 
 template <typename T>
-Householder<T>::Householder(const Vector<T> &essential,
-                            const T         &beta)
+Householder<T>::Householder(
+    const Vector<T> &essential,
+    const T         &beta
+)
     : essential_(essential),
       beta_(beta) {}
 
@@ -80,9 +82,11 @@ Householder<T> Householder<T>::FromVector(const Vector<T> &x) {
 }
 
 template <typename T>
-Householder<T> Householder<T>::FromColumn(const ConstMatrixView<T> &a,
-                                          Index                     col,
-                                          Index                     startRow) {
+Householder<T> Householder<T>::FromColumn(
+    const ConstMatrixView<T> &a,
+    Index                     col,
+    Index                     startRow
+) {
     const Index n = a.rows() - startRow;
     Vector<T>   x(n);
     for (Index i = 0; i < n; ++i) {
@@ -95,7 +99,9 @@ template <typename T> const Vector<T> &Householder<T>::essential() const {
     return essential_;
 }
 
-template <typename T> const T &Householder<T>::beta() const { return beta_; }
+template <typename T> const T &Householder<T>::beta() const {
+    return beta_;
+}
 
 template <typename T>
 typename Householder<T>::Index Householder<T>::size() const {
@@ -202,8 +208,10 @@ Matrix<T> Householder<T>::toMatrix(Index dimension) const {
 template <typename T> HouseholderSequence<T>::HouseholderSequence() {}
 
 template <typename T>
-HouseholderSequence<T>::HouseholderSequence(const Matrix<T> &reflectors,
-                                            const Vector<T> &betas) {
+HouseholderSequence<T>::HouseholderSequence(
+    const Matrix<T> &reflectors,
+    const Vector<T> &betas
+) {
     // Unpack a packed panel (LAPACK convention): column j holds reflector
     // j with an implicit unit diagonal, so its essential part is the
     // sub-diagonal entries reflectors(j+1.., j) and it acts at offset j.
@@ -259,26 +267,32 @@ Matrix<T> HouseholderSequence<T>::toMatrix(Index dimension) const {
     // Needs core Matrix (Phase 0). Stub until Matrix lands.
     (void)dimension;
     throw LinalgError(
-        "not implemented: linalg::HouseholderSequence<T>::toMatrix");
+        "not implemented: linalg::HouseholderSequence<T>::toMatrix"
+    );
 }
 
 template <typename T>
-Matrix<T> HouseholderSequence<T>::firstColumns(Index dimension,
-                                               Index count) const {
+Matrix<T> HouseholderSequence<T>::firstColumns(
+    Index dimension,
+    Index count
+) const {
     (void)dimension;
     (void)count;
     throw LinalgError(
-        "not implemented: linalg::HouseholderSequence<T>::firstColumns");
+        "not implemented: linalg::HouseholderSequence<T>::firstColumns"
+    );
 }
 
 template <typename T> Matrix<T> HouseholderSequence<T>::blockV() const {
     throw LinalgError(
-        "not implemented: linalg::HouseholderSequence<T>::blockV");
+        "not implemented: linalg::HouseholderSequence<T>::blockV"
+    );
 }
 
 template <typename T> Matrix<T> HouseholderSequence<T>::blockT() const {
     throw LinalgError(
-        "not implemented: linalg::HouseholderSequence<T>::blockT");
+        "not implemented: linalg::HouseholderSequence<T>::blockT"
+    );
 }
 
 template <typename T>
@@ -287,7 +301,8 @@ void HouseholderSequence<T>::buildBlockRepresentation(Index blockSize) {
     (void)blockSize;
     throw LinalgError(
         "not implemented: "
-        "linalg::HouseholderSequence<T>::buildBlockRepresentation");
+        "linalg::HouseholderSequence<T>::buildBlockRepresentation"
+    );
 }
 
 // Explicit instantiation. Every scalar the library ships is

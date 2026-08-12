@@ -18,10 +18,12 @@ Givens<T>::Givens()
       q_(Index{}) {}
 
 template <typename T>
-Givens<T>::Givens(const T &cosine,
-                  const T &sine,
-                  Index    p,
-                  Index    q)
+Givens<T>::Givens(
+    const T &cosine,
+    const T &sine,
+    Index    p,
+    Index    q
+)
     : cosine_(cosine),
       sine_(sine),
       radius_(NumericTraits<T>::zero()),
@@ -29,10 +31,12 @@ Givens<T>::Givens(const T &cosine,
       q_(q) {}
 
 template <typename T>
-Givens<T> Givens<T>::FromPair(const T &a,
-                              const T &b,
-                              Index    p,
-                              Index    q) {
+Givens<T> Givens<T>::FromPair(
+    const T &a,
+    const T &b,
+    Index    p,
+    Index    q
+) {
     // Referenced:
     // https://www.netlib.org/lapack/explore-html/da/dd3/group__lartg_ga86f8f877eaea0386cdc2c3c175d9ea88.html
     //
@@ -77,17 +81,23 @@ Givens<T> Givens<T>::FromPair(const T &a,
 }
 
 template <typename T>
-Givens<T> Givens<T>::Identity(Index p,
-                              Index q) {
+Givens<T> Givens<T>::Identity(
+    Index p,
+    Index q
+) {
     // c = 1, s = 0: the rotation is a no-op on the (p, q) plane.
     Givens rotation(NumericTraits<T>::one(), NumericTraits<T>::zero(), p, q);
     rotation.radius_ = NumericTraits<T>::zero();
     return rotation;
 }
 
-template <typename T> const T &Givens<T>::cosine() const { return cosine_; }
+template <typename T> const T &Givens<T>::cosine() const {
+    return cosine_;
+}
 
-template <typename T> const T &Givens<T>::sine() const { return sine_; }
+template <typename T> const T &Givens<T>::sine() const {
+    return sine_;
+}
 
 template <typename T> typename Givens<T>::Index Givens<T>::firstIndex() const {
     return p_;
@@ -97,7 +107,9 @@ template <typename T> typename Givens<T>::Index Givens<T>::secondIndex() const {
     return q_;
 }
 
-template <typename T> T Givens<T>::radius() const { return radius_; }
+template <typename T> T Givens<T>::radius() const {
+    return radius_;
+}
 
 template <typename T> Givens<T> Givens<T>::transposed() const {
     // Transposing [c, s; -conj(s), c] gives [c, -conj(s); s, c], the same
@@ -179,7 +191,9 @@ void GivensSequence<T>::append(const Givens<T> &rotation) {
     rotations_.push_back(rotation);
 }
 
-template <typename T> void GivensSequence<T>::clear() { rotations_.clear(); }
+template <typename T> void GivensSequence<T>::clear() {
+    rotations_.clear();
+}
 
 template <typename T>
 typename GivensSequence<T>::Index GivensSequence<T>::count() const {

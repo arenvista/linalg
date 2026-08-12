@@ -23,8 +23,10 @@ typename Norm<T>::Real Norm<T>::vectorInfinity(const Vector<T> &x) {
 }
 
 template <typename T>
-typename Norm<T>::Real Norm<T>::vectorP(const Vector<T> &x,
-                                        Real             p) {
+typename Norm<T>::Real Norm<T>::vectorP(
+    const Vector<T> &x,
+    Real             p
+) {
     return x.pNorm(p);
 }
 
@@ -93,29 +95,37 @@ typename Norm<T>::Real Norm<T>::matrixNuclear(const Matrix<T> &a) {
 }
 
 template <typename T>
-typename Norm<T>::Real Norm<T>::distance(const Vector<T> &x,
-                                         const Vector<T> &y) {
+typename Norm<T>::Real Norm<T>::distance(
+    const Vector<T> &x,
+    const Vector<T> &y
+) {
     return (x - y).norm();
 }
 
 template <typename T>
-typename Norm<T>::Real Norm<T>::relativeError(const Vector<T> &approx,
-                                              const Vector<T> &exact) {
+typename Norm<T>::Real Norm<T>::relativeError(
+    const Vector<T> &approx,
+    const Vector<T> &exact
+) {
     throw LinalgError("not implemented: linalg::Norm<T>::relativeError");
 }
 
 template <typename T>
-typename Norm<T>::Real Norm<T>::residualNorm(const Matrix<T> &a,
-                                             const Vector<T> &x,
-                                             const Vector<T> &b) {
+typename Norm<T>::Real Norm<T>::residualNorm(
+    const Matrix<T> &a,
+    const Vector<T> &x,
+    const Vector<T> &b
+) {
     Vector<T> Ax = a * x;
     return (b - Ax).norm();
 }
 
 template <typename T>
-typename Norm<T>::Real Norm<T>::backwardError(const Matrix<T> &a,
-                                              const Vector<T> &x,
-                                              const Vector<T> &b) {
+typename Norm<T>::Real Norm<T>::backwardError(
+    const Matrix<T> &a,
+    const Vector<T> &x,
+    const Vector<T> &b
+) {
     throw LinalgError("not implemented: linalg::Norm<T>::backwardError");
 }
 

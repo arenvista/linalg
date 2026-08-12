@@ -3,6 +3,7 @@
 #include "linalg/Instantiate.hpp"
 #include "linalg/core/Exceptions.hpp"
 #include "linalg/core/Matrix.hpp"
+#include "linalg/core/Traits.hpp"
 #include "linalg/core/Vector.hpp"
 
 namespace linalg {
@@ -12,8 +13,10 @@ namespace {
 // The effective operator op(A) is triangular; which triangle depends on both
 // the stored triangle and whether op transposes. A^T (or A^H) of a lower
 // triangle is upper and vice versa.
-bool isEffectiveLower(Triangle::Kind      uplo,
-                      Transposition::Kind trans) {
+bool isEffectiveLower(
+    Triangle::Kind      uplo,
+    Transposition::Kind trans
+) {
     const bool transposed = trans != Transposition::Kind::None;
     return (uplo == Triangle::Kind::Lower) != transposed;
 }
@@ -23,11 +26,13 @@ bool isEffectiveLower(Triangle::Kind      uplo,
 // is never touched. Forward substitution for an effectively-lower operator,
 // back substitution for an effectively-upper one.
 template <typename T>
-void substitute(const Matrix<T>    &a,
-                Vector<T>          &x,
-                Triangle::Kind      uplo,
-                Diagonal::Kind      diag,
-                Transposition::Kind trans) {
+void substitute(
+    const Matrix<T>    &a,
+    Vector<T>          &x,
+    Triangle::Kind      uplo,
+    Diagonal::Kind      diag,
+    Transposition::Kind trans
+) {
     using Traits = NumericTraits<T>;
     using Real   = typename Traits::Real;
     using Index  = std::size_t;
@@ -84,10 +89,12 @@ void substitute(const Matrix<T>    &a,
 // zeroed and the diagonal filled with ones under a unit-diagonal assumption.
 // Used for the one-norm in the condition estimate.
 template <typename T>
-Matrix<T> effectiveOperator(const Matrix<T>    &a,
-                            Triangle::Kind      uplo,
-                            Diagonal::Kind      diag,
-                            Transposition::Kind trans) {
+Matrix<T> effectiveOperator(
+    const Matrix<T>    &a,
+    Triangle::Kind      uplo,
+    Diagonal::Kind      diag,
+    Transposition::Kind trans
+) {
     using Traits = NumericTraits<T>;
     using Index  = std::size_t;
 
@@ -126,38 +133,51 @@ TriangularSolver<T>::TriangularSolver(const Options &options)
     : options_(options) {}
 
 template <typename T>
-Vector<T> TriangularSolver<T>::solve(const Matrix<T> &a,
-                                     const Vector<T> &b) const {
+Vector<T> TriangularSolver<T>::solve(
+    const Matrix<T> &a,
+    const Vector<T> &b
+) const {
     Vector<T> x = b;
     solveInPlace(a, x);
     return x;
 }
 
 template <typename T>
-Matrix<T> TriangularSolver<T>::solve(const Matrix<T> &a,
-                                     const Matrix<T> &b) const {
+Matrix<T> TriangularSolver<T>::solve(
+    const Matrix<T> &a,
+    const Matrix<T> &b
+) const {
     Matrix<T> x = b;
     solveInPlace(a, x);
     return x;
 }
 
 template <typename T>
-void TriangularSolver<T>::solveInPlace(const Matrix<T> &a,
-                                       Vector<T>       &b) const {
+void TriangularSolver<T>::solveInPlace(
+    const Matrix<T> &a,
+    Vector<T>       &b
+) const {
     substitute(a, b, options_.uplo, options_.diagonal, options_.transposition);
 }
 
 template <typename T>
-void TriangularSolver<T>::solveInPlace(const Matrix<T> &a,
-                                       Matrix<T>       &b) const {
+void TriangularSolver<T>::solveInPlace(
+    const Matrix<T> &a,
+    Matrix<T>       &b
+) const {
     if (a.rows() != a.cols() || a.cols() != b.rows()) {
         throw DimensionMismatch(a.rows(), a.cols(), b.rows(), b.cols());
     }
     // Each column of b is an independent right-hand side.
     for (Index j = 0; j < b.cols(); ++j) {
         Vector<T> column = b.col(j);
-        substitute(a, column, options_.uplo, options_.diagonal,
-                   options_.transposition);
+        substitute(
+            a,
+            column,
+            options_.uplo,
+            options_.diagonal,
+            options_.transposition
+        );
         b.setCol(j, column);
     }
 }
@@ -175,12 +195,16 @@ Matrix<T> TriangularSolver<T>::inverse(const Matrix<T> &a) const {
 }
 
 template <typename T>
-typename TriangularSolver<T>::Real
-TriangularSolver<T>::reciprocalConditionEstimate(const Matrix<T> &a) const {
+typename TriangularSolver<T>::Real TriangularSolver<
+    T>::reciprocalConditionEstimate(const Matrix<T> &a) const {
     // rcond = 1 / (||op(A)||_1 * ||op(A)^-1||_1), clamped to 0 when
     // singular.
-    Matrix<T>  m     = effectiveOperator(a, options_.uplo, options_.diagonal,
-                                         options_.transposition);
+    Matrix<T> m = effectiveOperator(
+        a,
+        options_.uplo,
+        options_.diagonal,
+        options_.transposition
+    );
     const Real normA = m.oneNorm();
     if (normA == Real(0)) {
         return Real(0);
@@ -198,8 +222,10 @@ TriangularSolver<T>::reciprocalConditionEstimate(const Matrix<T> &a) const {
 }
 
 template <typename T>
-bool TriangularSolver<T>::isNonsingular(const Matrix<T> &a,
-                                        Real             tolerance) const {
+bool TriangularSolver<T>::isNonsingular(
+    const Matrix<T> &a,
+    Real             tolerance
+) const {
     // A unit diagonal is an implied all-ones diagonal, always nonsingular.
     if (options_.diagonal == Diagonal::Kind::Unit) {
         return true;

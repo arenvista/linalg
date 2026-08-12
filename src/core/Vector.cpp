@@ -517,22 +517,10 @@ template <typename T> T Vector<T>::maxCoefficient() const {
     for (std::size_t i = 1; i < storage_.size(); i++) {
         if (NumericTraits<T>::real(storage_[i]) >
             NumericTraits<T>::real(maxValue)) {
-<<<<<<< HEAD
-            maxValue             = storage_[i];
-            T           maxValue = storage_[0];
-            std::size_t maxIndex = 0;
-            for (std::size_t i = 1; i < storage_.size(); i++) {
-                if (NumericTraits<T>::abs(storage_[i]) >
-                    NumericTraits<T>::abs(maxValue)) {
-                    maxValue = storage_[i];
-                    maxIndex = i;
-                }
-            }
-            return maxValue;
-=======
->>>>>>> b33698b (added isApprox)
+            maxValue = storage_[i];
         }
     }
+    return maxValue;
 }
 
 template <typename T> T Vector<T>::minCoefficient() const {
@@ -545,19 +533,10 @@ template <typename T> T Vector<T>::minCoefficient() const {
     for (std::size_t i = 1; i < storage_.size(); i++) {
         if (NumericTraits<T>::real(storage_[i]) <
             NumericTraits<T>::real(minValue)) {
-            minValue             = storage_[i];
-            T           minValue = storage_[0];
-            std::size_t minIndex = 0;
-            for (std::size_t i = 1; i < storage_.size(); i++) {
-                if (NumericTraits<T>::abs(storage_[i]) <
-                    NumericTraits<T>::abs(minValue)) {
-                    minValue = storage_[i];
-                    minIndex = i;
-                }
-            }
-            return minValue;
+            minValue = storage_[i];
         }
     }
+    return minValue;
 }
 
 template <typename T>
