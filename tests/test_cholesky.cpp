@@ -86,6 +86,66 @@ void test_read_triangle_option() {
     assert((chol.lower() * chol.upper()).isApprox(a, 1e-8));
 }
 
+void test_read_upper_triangle() {
+    // readFrom == Upper must read only the upper triangle and still return a
+    // genuinely lower-triangular L from lower(); junk below the diagonal is
+    // ignored. (Regression: lower()/upper() used to transpose for Upper.)
+    M a = spd(4, 65);
+    M junky = a;
+    for (std::size_t i = 0; i < 4; ++i)
+        for (std::size_t j = 0; j < i; ++j)
+            junky(i, j) = 999.0; // poison the strictly-lower triangle
+    Cholesky<double>::Options o;
+    o.readFrom = Triangle::Kind::Upper;
+    o.useBlocked = false;
+    o.blockSize = 0;
+    o.throwOnIndefinite = false;
+    Cholesky<double> chol(junky, o);
+    assert(chol.isPositiveDefinite());
+    M l = chol.lower();
+    assert(l.isTriangular(Triangle::Kind::Lower, 1e-12)); // L is lower, not L^H
+    assert(chol.upper().isApprox(l.transpose(), 1e-14));
+    assert((l * chol.upper()).isApprox(a, 1e-8)); // recovers the true A
+}
+
+void test_update() {
+    // Standalone (no downdate) so it runs rather than skipping: a rank-one
+    // update must yield a factor of A + x x^H that is still lower-triangular
+    // with a positive diagonal, and still solves the modified system.
+    M a = spd(4, 68);
+    V x = V::Random(4, 69);
+    Cholesky<double> chol(a);
+    chol.update(x);
+    M updated = a + x.outer(x); // A + x x^H
+    M l = chol.lower();
+    assert((l * chol.upper()).isApprox(updated, 1e-8));
+    assert(l.isTriangular(Triangle::Kind::Lower, 1e-12));
+    for (std::size_t i = 0; i < 4; ++i)
+        assert(l(i, i) > 0.0);
+    V b = V::Random(4, 70);
+    assert((updated * chol.solve(b)).isApprox(b, 1e-8));
+}
+
+void test_blocked_matches_unblocked() {
+    // useBlocked currently falls back to the unblocked algorithm, but it must
+    // no longer be a silent no-op: the blocked path must produce a valid factor
+    // matching the unblocked one. (Regression: compute() ignored useBlocked.)
+    M a = spd(6, 74);
+    Cholesky<double>::Options blocked;
+    blocked.readFrom = Triangle::Kind::Lower;
+    blocked.useBlocked = true;
+    blocked.blockSize = 2;
+    blocked.throwOnIndefinite = false;
+    Cholesky<double> cb(a, blocked);
+    assert(cb.isPositiveDefinite());
+    M l = cb.lower();
+    assert(l.isTriangular(Triangle::Kind::Lower, 1e-12));
+    assert((l * cb.upper()).isApprox(a, 1e-8));
+    // identical to the default unblocked factor
+    Cholesky<double> cu(a);
+    assert(l.isApprox(cu.lower(), 1e-12));
+}
+
 void test_indefinite_is_a_result() {
     M indef{{1, 2}, {2, 1}}; // eigenvalues 3, -1
     // default: recorded, not thrown
@@ -200,6 +260,9 @@ int main() {
     run("solve", test_solve);
     run("determinant", test_determinant);
     run("read_triangle_option", test_read_triangle_option);
+    run("read_upper_triangle", test_read_upper_triangle);
+    run("update", test_update);
+    run("blocked_matches_unblocked", test_blocked_matches_unblocked);
     run("indefinite_is_a_result", test_indefinite_is_a_result);
     run("condition_estimate", test_condition_estimate);
     run("complex_hermitian", test_complex_hermitian);

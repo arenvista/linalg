@@ -20,7 +20,7 @@ Cholesky<T>::Cholesky()
               Triangle::Kind::Lower,
               false,
               0,
-              true
+              false
           }
       ),
       computed_(false),
@@ -35,7 +35,7 @@ Cholesky<T>::Cholesky(const Matrix<T> &a)
               Triangle::Kind::Lower,
               false,
               0,
-              true
+              false
           }
       ),
       computed_(false),
@@ -62,54 +62,14 @@ template <typename T> void Cholesky<T>::compute(const Matrix<T> &a) {
         throw DimensionMismatch(a.rows(), a.cols(), a.rows(), a.cols());
     }
 
-    using Traits  = NumericTraits<T>;
-    const Index n = a.rows();
-
-    // A is Hermitian, so only the caller-selected triangle is read; the
-    // opposite triangle is never touched. The lower entry (i >= j) that the
-    // algorithm needs is the conjugate of the stored upper entry.
-    const bool readsLower = options_.readFrom == Triangle::Kind::Lower;
-    auto       lowerOf    = [&](Index i, Index j) -> T {
-        return readsLower ? a(i, j) : Traits::conj(a(j, i));
-    };
-
-    // Bordered (left-looking) Cholesky: build L one column at a time in the
-    // lower triangle of factor_, leaving the strict upper triangle zero.
-    Matrix<T> factor(n, n);
-    for (Index j = 0; j < n; ++j) {
-        Real pivot = Traits::real(a(j, j));
-        for (Index k = 0; k < j; ++k) {
-            pivot -= Traits::absSquared(factor(j, k));
-        }
-
-        // The pivot is real for a Hermitian matrix; a non-positive value
-        // (or NaN) means A is not positive definite at column j.
-        if (!(pivot > Real(0))) {
-            if (options_.throwOnIndefinite) {
-                throw NotPositiveDefinite(j);
-            }
-            factor_           = std::move(factor);
-            computed_         = true;
-            positiveDefinite_ = false;
-            failedPivot_      = j;
-            return;
-        }
-
-        const T diagonal = Traits::sqrt(T(pivot));
-        factor(j, j)     = diagonal;
-        for (Index i = j + 1; i < n; ++i) {
-            T sum = lowerOf(i, j);
-            for (Index k = 0; k < j; ++k) {
-                sum -= factor(i, k) * Traits::conj(factor(j, k));
-            }
-            factor(i, j) = sum / diagonal;
-        }
+    // Seed the working matrix; the factorization routines read A from factor_
+    // and overwrite it with L. Dispatch on the requested variant.
+    factor_ = a;
+    if (options_.useBlocked) {
+        blockedFactorize(options_.blockSize);
+    } else {
+        unblockedFactorize();
     }
-
-    factor_           = std::move(factor);
-    computed_         = true;
-    positiveDefinite_ = true;
-    failedPivot_      = n; // sentinel: no failed pivot
 }
 
 template <typename T> bool Cholesky<T>::isComputed() const {
@@ -121,15 +81,13 @@ template <typename T> bool Cholesky<T>::isPositiveDefinite() const {
 }
 
 template <typename T> Matrix<T> Cholesky<T>::lower() const {
-    return options_.readFrom == Triangle::Kind::Lower
-               ? factor_
-               : factor_.conjugateTranspose();
+    // compute() always builds L into the lower triangle, independent of which
+    // input triangle was read, so the factor is returned as-is here.
+    return factor_;
 }
 
 template <typename T> Matrix<T> Cholesky<T>::upper() const {
-    return options_.readFrom == Triangle::Kind::Lower
-               ? factor_.conjugateTranspose()
-               : factor_;
+    return factor_.conjugateTranspose();
 }
 
 template <typename T> Vector<T> Cholesky<T>::solve(const Vector<T> &b) const {
@@ -264,7 +222,24 @@ typename Cholesky<T>::Real Cholesky<T>::reciprocalConditionEstimate() const {
 }
 
 template <typename T> void Cholesky<T>::update(const Vector<T> &x) {
-    throw LinalgError("not implemented: linalg::Cholesky<T>::update");
+    // See lecture 8 from notes
+    // Apply a sequence of Givens rotations to [Lᵀ; xᵀ] so that the appended
+    // row is annihilated, leaving the updated factor with L̄ L̄ᵀ = L Lᵀ + x xᵀ.
+    // factor_ holds the lower factor, so the k-th "row" of Lᵀ lives in column k
+    // below the diagonal: factor_(j, k) for j >= k.
+    Vector<T> z = x;
+    for (Index k = 0; k < x.size(); ++k) {
+        T r           = std::sqrt(factor_(k, k) * factor_(k, k) + z(k) * z(k));
+        T c           = factor_(k, k) / r;
+        T s           = z(k) / r;
+        factor_(k, k) = r;
+        z[k]          = T(0);
+        for (Index j = k + 1; j < z.size(); ++j) {
+            T t           = c * factor_(j, k) + s * z(j);
+            z[j]          = c * z[j] - s * factor_(j, k);
+            factor_(j, k) = t;
+        }
+    }
 }
 
 template <typename T> void Cholesky<T>::downdate(const Vector<T> &x) {
@@ -272,13 +247,63 @@ template <typename T> void Cholesky<T>::downdate(const Vector<T> &x) {
 }
 
 template <typename T> void Cholesky<T>::unblockedFactorize() {
-    throw LinalgError(
-        "not implemented: linalg::Cholesky<T>::unblockedFactorize"
-    );
+    using Traits  = NumericTraits<T>;
+    const Index n = factor_.rows();
+
+    // A is Hermitian, so only the caller-selected triangle is read; the
+    // opposite triangle is never touched. The lower entry (i >= j) that the
+    // algorithm needs is the conjugate of the stored upper entry. factor_ still
+    // holds the seeded A throughout the loop; L is built into a fresh matrix.
+    const bool readsLower = options_.readFrom == Triangle::Kind::Lower;
+    auto       lowerOf    = [&](Index i, Index j) -> T {
+        return readsLower ? factor_(i, j) : Traits::conj(factor_(j, i));
+    };
+
+    // Bordered (left-looking) Cholesky: build L one column at a time in the
+    // lower triangle of factor, leaving the strict upper triangle zero.
+    Matrix<T> factor(n, n);
+    for (Index j = 0; j < n; ++j) {
+        Real pivot = Traits::real(factor_(j, j));
+        for (Index k = 0; k < j; ++k) {
+            pivot -= Traits::absSquared(factor(j, k));
+        }
+
+        // The pivot is real for a Hermitian matrix; a non-positive value
+        // (or NaN) means A is not positive definite at column j.
+        if (!(pivot > Real(0))) {
+            if (options_.throwOnIndefinite) {
+                throw NotPositiveDefinite(j);
+            }
+            factor_           = std::move(factor);
+            computed_         = true;
+            positiveDefinite_ = false;
+            failedPivot_      = j;
+            return;
+        }
+
+        const T diagonal = Traits::sqrt(T(pivot));
+        factor(j, j)     = diagonal;
+        for (Index i = j + 1; i < n; ++i) {
+            T sum = lowerOf(i, j);
+            for (Index k = 0; k < j; ++k) {
+                sum -= factor(i, k) * Traits::conj(factor(j, k));
+            }
+            factor(i, j) = sum / diagonal;
+        }
+    }
+
+    factor_           = std::move(factor);
+    computed_         = true;
+    positiveDefinite_ = true;
+    failedPivot_      = n; // sentinel: no failed pivot
 }
 
 template <typename T> void Cholesky<T>::blockedFactorize(Index blockSize) {
-    throw LinalgError("not implemented: linalg::Cholesky<T>::blockedFactorize");
+    // A genuine panel-blocked Cholesky is not implemented yet. Blocking is a
+    // performance optimization only, so fall back to the unblocked algorithm
+    // to keep results correct when useBlocked is requested.
+    (void)blockSize;
+    unblockedFactorize();
 }
 
 template <typename T> LDLT<T>::LDLT() {
