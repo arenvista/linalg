@@ -5,12 +5,16 @@
 #include "linalg/core/MatrixView.hpp"
 #include "linalg/core/Traits.hpp"
 #include "linalg/core/Vector.hpp"
+#include "linalg/decomp/LU.hpp"
 #include "linalg/ops/Kernels.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <initializer_list>
 #include <iomanip>
+#include <limits>
+#include <locale>
 #include <random>
 #include <sstream>
 #include <string>
@@ -49,7 +53,11 @@ Matrix<T>::Matrix(Index                 rows,
                   const std::vector<T> &rowMajorData)
     : rows_(rows),
       cols_(cols),
-      storage_(rowMajorData) {}
+      storage_(rowMajorData) {
+    if (storage_.size() != rows_ * cols_) {
+        throw DimensionMismatch(rows_, cols_, rowMajorData.size(), 1);
+    }
+}
 
 template <typename T>
 Matrix<T>::Matrix(std::initializer_list<std::initializer_list<T>> rows)
@@ -58,8 +66,9 @@ Matrix<T>::Matrix(std::initializer_list<std::initializer_list<T>> rows)
       storage_() {
     storage_.reserve(rows_ * cols_);
     for (const std::initializer_list<T> &row : rows) {
-        // inefficient catch if(row.size() != cols_){throw LinalgError("ragged
-        // rows: initializer-list linalg::Matrix<T> ctor");}
+        if (row.size() != cols_) {
+            throw DimensionMismatch(1, cols_, 1, row.size());
+        }
         storage_.insert(storage_.end(), row.begin(), row.end());
     }
 }
@@ -441,8 +450,7 @@ template <typename T> Matrix<T> Matrix<T>::operator*(const Matrix &rhs) const {
     if (cols_ != rhs.rows_) {
         throw DimensionMismatch(rows_, cols_, rhs.rows_, rhs.cols_);
     }
-    // beta == 0 makes the output write-only, so the constructor's zero fill
-    // is not depended on; result is fresh, so it cannot alias either operand.
+    // Fresh result: cannot alias an operand, and beta == 0 makes it write-only.
     Matrix result(rows_, rhs.cols_);
     Kernels<T>::gemm(Transposition::Kind::None, Transposition::Kind::None, T(1),
                      view(), rhs.view(), T{}, result.view());
@@ -467,8 +475,7 @@ template <typename T> Matrix<T> Matrix<T>::operator*(const T &scalar) const {
 }
 
 template <typename T> Matrix<T> Matrix<T>::operator/(const T &scalar) const {
-    // Divides rather than scaling by 1/scalar: the reciprocal rounds twice
-    // and overflows for subnormal divisors.
+    // Not scaling by 1/scalar: that rounds twice and breaks on subnormals.
     Matrix result(rows_, cols_);
     for (Index k = 0; k < size(); ++k) {
         result.storage_[k] = storage_[k] / scalar;
@@ -495,8 +502,7 @@ template <typename T> Matrix<T> &Matrix<T>::operator-=(const Matrix &rhs) {
 }
 
 template <typename T> Matrix<T> &Matrix<T>::operator*=(const Matrix &rhs) {
-    // gemm forbids the output aliasing an input, and the shape changes when
-    // rhs is not square, so this cannot accumulate in place.
+    // gemm forbids output/input aliasing, so this cannot accumulate in place.
     *this = (*this) * rhs;
     return *this;
 }
@@ -514,8 +520,15 @@ template <typename T> Matrix<T> &Matrix<T>::operator/=(const T &scalar) {
 }
 
 template <typename T> bool Matrix<T>::operator==(const Matrix &rhs) const {
-    // Exact equality, shape included; isApprox is the tolerant comparison.
-    return rows_ == rhs.rows_ && cols_ == rhs.cols_ && storage_ == rhs.storage_;
+    if (rows_ != rhs.rows_ || cols_ != rhs.cols_) {
+        return false;
+    }
+    for (Index k = 0; k < size(); ++k) {
+        if (!(storage_[k] == rhs.storage_[k])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 template <typename T> bool Matrix<T>::operator!=(const Matrix &rhs) const {
@@ -568,8 +581,7 @@ template <typename T> Matrix<T> Matrix<T>::power(Index exponent) const {
     if (!isSquare()) {
         throw DimensionMismatch(rows_, cols_, cols_, rows_);
     }
-    // Binary exponentiation: ~log2(exponent) products rather than exponent
-    // of them. Exponent 0 gives the identity, including for a 0 x 0 matrix.
+    // Binary exponentiation; exponent 0 gives the identity.
     Matrix result = Identity(rows_);
     Matrix base(*this);
     for (Index e = exponent; e != 0; e >>= 1) {
@@ -583,14 +595,12 @@ template <typename T> Matrix<T> Matrix<T>::power(Index exponent) const {
 
 // element manip
 template <typename T> Matrix<T> Matrix<T>::transpose() const {
-    // transposed() swaps shape and strides without copying; toMatrix then
-    // walks that view into fresh contiguous row-major storage.
+    // transposed() swaps shape and strides; toMatrix copies into fresh storage.
     return view().transposed().toMatrix();
 }
 
 template <typename T> Matrix<T> Matrix<T>::conjugateTranspose() const {
-    // Not transpose() + a conj pass: one traversal, and conj is the
-    // identity for real T, so this collapses to a plain transpose there.
+    // One traversal; conj is the identity for real T.
     Matrix result(cols_, rows_);
     for (Index i = 0; i < rows_; ++i) {
         for (Index j = 0; j < cols_; ++j) {
@@ -696,19 +706,17 @@ void Matrix<T>::resize(Index rows,
 template <typename T>
 void Matrix<T>::conservativeResize(Index rows,
                                    Index cols) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::conservativeReSize");
-
-    /*// Row-major means growing the column count moves every row, so this
+    // Row-major means growing the column count moves every row, so this
     // rebuilds rather than resizing the buffer in place.
-    Matrix       result(rows, cols);
-    const Index  keptRows = (rows < rows_) ? rows : rows_;
-    const Index  keptCols = (cols < cols_) ? cols : cols_;
+    Matrix      result(rows, cols);
+    const Index keptRows = (rows < rows_) ? rows : rows_;
+    const Index keptCols = (cols < cols_) ? cols : cols_;
     for (Index i = 0; i < keptRows; ++i) {
         for (Index j = 0; j < keptCols; ++j) {
             result(i, j) = (*this)(i, j);
         }
     }
-    swap(result); // growth stays zero-filled from result's construction*/
+    swap(result); // growth stays zero-filled from result's construction
 }
 
 template <typename T>
@@ -774,7 +782,7 @@ template <typename T> T Matrix<T>::sum() const {
 }
 
 template <typename T> T Matrix<T>::determinant() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::determinant");
+    return LU<T>(*this).determinant();
 }
 
 template <typename T> typename Matrix<T>::Real Matrix<T>::oneNorm() const {
@@ -808,8 +816,7 @@ template <typename T> typename Matrix<T>::Real Matrix<T>::infinityNorm() const {
 
 template <typename T>
 typename Matrix<T>::Real Matrix<T>::frobeniusNorm() const {
-    // The Frobenius norm is the 2-norm of the flattened buffer, so nrm2
-    // covers it directly
+    // The 2-norm of the flattened buffer; nrm2 brings overflow-safe scaling.
     return Kernels<T>::nrm2(size(), storage_.data(), 1);
 }
 
@@ -840,8 +847,7 @@ template <typename T> bool Matrix<T>::isSymmetric(Real tolerance) const {
     if (!isSquare()) {
         return false; // a rectangular matrix cannot equal its transpose
     }
-    // Compares against the transpose without forming it; only the strictly
-    // upper triangle is walked, since the diagonal matches itself.
+    // Compares against the transpose without forming it.
     for (Index i = 0; i < rows_; ++i) {
         for (Index j = i + 1; j < cols_; ++j) {
             if (!NumericTraits<T>::isApproxZero((*this)(i, j) - (*this)(j, i),
@@ -858,8 +864,7 @@ template <typename T> bool Matrix<T>::isHermitian(Real tolerance) const {
         return false;
     }
     for (Index i = 0; i < rows_; ++i) {
-        // A Hermitian diagonal is real, so the diagonal is a genuine test
-        // here rather than the tautology it is for isSymmetric.
+        // A Hermitian diagonal is real, so this is a genuine test.
         if (!NumericTraits<T>::isApproxZero(
                 (*this)(i, i) - NumericTraits<T>::conj((*this)(i, i)),
                 tolerance)) {
@@ -877,8 +882,7 @@ template <typename T> bool Matrix<T>::isHermitian(Real tolerance) const {
 }
 
 template <typename T> bool Matrix<T>::isDiagonal(Real tolerance) const {
-    // No square requirement: a rectangular matrix is diagonal when
-    // everything off the main diagonal is negligible.
+    // No square requirement; rectangular matrices have a main diagonal too.
     for (Index i = 0; i < rows_; ++i) {
         for (Index j = 0; j < cols_; ++j) {
             if (i != j &&
@@ -893,9 +897,7 @@ template <typename T> bool Matrix<T>::isDiagonal(Real tolerance) const {
 template <typename T>
 bool Matrix<T>::isTriangular(Triangle::Kind which,
                              Real           tolerance) const {
-    // `which` names the triangle allowed to hold data, so the test is that
-    // the opposite one vanishes. The diagonal belongs to both and is
-    // never checked.
+    // `which` names the triangle allowed to hold data; the other must vanish.
     const bool upper = (which == Triangle::Kind::Upper);
     for (Index i = 0; i < rows_; ++i) {
         for (Index j = 0; j < cols_; ++j) {
@@ -910,8 +912,7 @@ bool Matrix<T>::isTriangular(Triangle::Kind which,
 }
 
 template <typename T> bool Matrix<T>::isOrthogonal(Real tolerance) const {
-    // A^H A == I. For a tall matrix this is the columns-orthonormal test,
-    // which is why the identity is sized by cols_ rather than rows_.
+    // A^H A == I; sized by cols_ so a tall matrix gets the orthonormal test.
     const Matrix gram = conjugateTranspose() * (*this);
     return gram.isApprox(Identity(cols_), tolerance);
 }
@@ -919,8 +920,7 @@ template <typename T> bool Matrix<T>::isOrthogonal(Real tolerance) const {
 template <typename T>
 bool Matrix<T>::isApprox(const Matrix &other,
                          Real          tolerance) const {
-    // A shape mismatch is a false result, not an error: this is the
-    // tolerant counterpart to operator==, which also just returns false.
+    // Shape mismatch is a false result, not an error, as with operator==.
     if (rows_ != other.rows_ || cols_ != other.cols_) {
         return false;
     }
@@ -946,7 +946,7 @@ template <typename T> bool Matrix<T>::hasNaN() const {
 
 // derived matrices
 template <typename T> Matrix<T> Matrix<T>::inverse() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::inverse");
+    return LU<T>(*this).inverse();
 }
 
 template <typename T> Matrix<T> Matrix<T>::pseudoInverse(Real tolerance) const {
@@ -973,8 +973,7 @@ template <typename T> std::string Matrix<T>::toString(int precision) const {
     std::size_t              width = 0;
     for (Index k = 0; k < size(); ++k) {
         std::ostringstream cell;
-        // std::complex carries its own operator<<, so real and complex T
-        // both format through this one path.
+        // std::complex has its own operator<<, so one path serves both.
         cell << std::setprecision(precision) << storage_[k];
         cells[k] = cell.str();
         if (cells[k].size() > width) {
@@ -999,15 +998,175 @@ template <typename T> std::string Matrix<T>::toString(int precision) const {
 }
 
 template <typename T> std::string Matrix<T>::toMatlabLiteral() const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::toMatlabLiteral");
+    std::ostringstream out;
+    // force classic locale since a decimal-comma locale would emit "1,25" and
+    // break the literal for MATLAB.
+    out.imbue(std::locale::classic());
+    out << std::setprecision(std::numeric_limits<Real>::max_digits10);
+    out << '[';
+    for (Index i = 0; i < rows_; ++i) {
+        if (i > 0) {
+            out << "; "; // row separator, as in the header's "[a b; c d]"
+        }
+        for (Index j = 0; j < cols_; ++j) {
+            if (j > 0) {
+                out << ' ';
+            }
+            const T &value = (*this)(i, j);
+            if constexpr (IsComplex<T>::value) {
+                // Matlab wants re+imi; a negative im already carries its sign.
+                const Real re = NumericTraits<T>::real(value);
+                const Real im = NumericTraits<T>::imag(value);
+                out << re;
+                if (im >= Real{}) {
+                    out << '+';
+                }
+                out << im << 'i';
+            } else {
+                out << value;
+            }
+        }
+    }
+    out << ']';
+    return out.str();
 }
 
 template <typename T> Matrix<T> Matrix<T>::FromCsv(const std::string &path) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::FromCsv");
+    // May have regional problems due to ; cell delimiters
+    std::ifstream in(path);
+    if (!in) {
+        throw LinalgError("cannot open for reading: " + path);
+    }
+    // Per-cell streams inherit the global locale, not the file's, so the
+    // classic locale is pinned here rather than on `in`.
+    const auto parseReal = [](const std::string &text, Real &out) {
+        std::istringstream cellStream(text);
+        cellStream.imbue(std::locale::classic());
+        if (!(cellStream >> out)) {
+            return false;
+        }
+        char extra; // >> stops at the first bad character; catch the rest
+        return !(cellStream >> extra);
+    };
+
+    // Accepts re+imi, re-imi, 4i, bare i, or a plain real.
+    const auto parseCell = [&parseReal](const std::string &text, T &out) {
+        if constexpr (!IsComplex<T>::value) {
+            return parseReal(text, out);
+        } else {
+            const std::size_t first = text.find_first_not_of(" \t\r");
+            const std::size_t last  = text.find_last_not_of(" \t\r");
+            if (first == std::string::npos) {
+                return false;
+            }
+            const std::string cell = text.substr(first, last - first + 1);
+
+            Real re = Real{};
+            Real im = Real{};
+            if (cell.back() != 'i' && cell.back() != 'j') {
+                if (!parseReal(cell, re)) {
+                    return false;
+                }
+                out = T(re, Real{});
+                return true;
+            }
+            const std::string body = cell.substr(0, cell.size() - 1);
+
+            // The separator is a sign that is neither leading nor part of
+            // an exponent, so 1e-3-2e-5i splits at the middle '-'.
+            std::size_t split = std::string::npos;
+            for (std::size_t k = body.size(); k-- > 1;) {
+                const char c = body[k];
+                if ((c == '+' || c == '-') && body[k - 1] != 'e' &&
+                    body[k - 1] != 'E') {
+                    split = k;
+                    break;
+                }
+            }
+
+            std::string realPart = "0";
+            std::string imagPart = body;
+            if (split != std::string::npos) {
+                realPart = body.substr(0, split);
+                imagPart = body.substr(split);
+            }
+            if (imagPart.empty() || imagPart == "+") {
+                imagPart = "1"; // bare "i"
+            } else if (imagPart == "-") {
+                imagPart = "-1";
+            }
+            if (!parseReal(realPart, re) || !parseReal(imagPart, im)) {
+                return false;
+            }
+            out = T(re, im);
+            return true;
+        }
+    };
+
+    std::vector<T> values;
+    Index          rows = 0;
+    Index          cols = 0;
+    std::string    line;
+    while (std::getline(in, line)) {
+        if (line.find_first_not_of(" \t\r") == std::string::npos) {
+            continue; // trailing newline would otherwise add a phantom row
+        }
+        Index              rowCols = 0;
+        std::istringstream lineStream(line);
+        std::string        cell;
+        while (std::getline(lineStream, cell, ',')) {
+            T value;
+            if (!parseCell(cell, value)) {
+                throw LinalgError("malformed CSV cell in " + path + ": " +
+                                  cell);
+            }
+            values.push_back(value);
+            ++rowCols;
+        }
+        if (rows == 0) {
+            cols = rowCols;
+        } else if (rowCols != cols) {
+            throw LinalgError("ragged CSV row in " + path);
+        }
+        ++rows;
+    }
+    return Matrix(rows, cols, values);
 }
 
 template <typename T> void Matrix<T>::writeCsv(const std::string &path) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::writeCsv");
+    std::ofstream out(path);
+    if (!out) {
+        throw LinalgError("cannot open for writing: " + path);
+    }
+    // force into classic locale
+    out.imbue(std::locale::classic());
+    // Round-trip precision; the stream default of 6 digits would lose it.
+    out << std::setprecision(std::numeric_limits<Real>::max_digits10);
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            if (j > 0) {
+                out << ',';
+            }
+            const T &value = (*this)(i, j);
+            if constexpr (IsComplex<T>::value) {
+                // re+imi rather than std::complex's own "(re,im)", which
+                // would put a comma inside the field.
+                const Real re = NumericTraits<T>::real(value);
+                const Real im = NumericTraits<T>::imag(value);
+                out << re;
+                if (im >= Real{}) {
+                    out << '+';
+                }
+                out << im << 'i';
+            } else {
+                out << value;
+            }
+        }
+        out << '\n';
+    }
+    if (!out) {
+        throw LinalgError("write failed: " + path);
+    }
 }
 
 // privates
