@@ -8,3 +8,4 @@ build/
 # tools/gen-compile-commands.zsh rather than committing it.
 compile_commands.json
 PLAN.pdf
+PLAN.md
