@@ -215,4 +215,4 @@ progress · `[ ]` not started.
 
 ## License
 
-Not yet chosen — a license file still needs to be added before this is reusable.
+Released under the [MIT License](LICENSE).

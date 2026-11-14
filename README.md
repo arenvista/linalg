@@ -116,4 +116,4 @@ cd docs && ./compile.sh
 
 ## License
 
-Not yet chosen. A license file still needs to be added before this is reusable.
+Released under the [MIT License](LICENSE).
