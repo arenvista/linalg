@@ -6,9 +6,11 @@ abstraction.
 
 The design goal is a correct, readable, and reasonably efficient library that works through the algorithms taught in a
 numerical linear algebra course — and gets the hard parts right: stability-driven algorithm choices, floating-point edge
-cases (overflow-safe norms, cancellation-free reflectors, deflation criteria), and verification against the
-mathematical identities each component must satisfy. The design narrative lives in
-[`docs/main.typ`](docs/main.typ) (`typst compile docs/main.typ`).
+cases (overflow-safe norms, cancellation-free reflectors, deflation criteria), and verification against the mathematical
+identities each component must satisfy. The design narrative lives in [`docs/main.typ`](docs/main.typ)
+(`typst compile docs/main.typ`).
+
+**These routines are applications of the algorithims referenced in the outline under /docs/NumericalLinearAlgebra.pdf**
 
 ## Status
 
@@ -66,7 +68,7 @@ as the reference manual.
 Two examples of the stability work that separates this from a naive triple-loop implementation:
 
 - **`Householder::FromVector`** accumulates the tail norm directly instead of forming `‖x‖² − |α|²`, and chooses the
-  reflection sign *opposite* the leading entry's phase (for complex scalars too) so the subtraction `α − r` never loses
+  reflection sign _opposite_ the leading entry's phase (for complex scalars too) so the subtraction `α − r` never loses
   significance to cancellation.
 - **`Givens::FromPair`** follows LAPACK's `dlartg`: it scales by the larger magnitude before squaring, so the one square
   root cannot over- or underflow even for inputs near `1e±200` in double precision, where the naive `sqrt(a² + b²)`
@@ -117,7 +119,7 @@ src/decomp/QR.cpp                definitions + explicit instantiation
 
 The instantiation list is driven by one macro, `LINALG_FOR_EACH_SCALAR`, defined in `include/linalg/Instantiate.hpp`,
 currently covering `float`, `double`, `std::complex<float>`, and `std::complex<double>`. Adding a scalar is a one-line
-change there; anything outside the list compiles but fails to *link*. Each header also carries the matching
+change there; anything outside the list compiles but fails to _link_. Each header also carries the matching
 `extern template` declarations, so including a header never triggers an implicit instantiation and the supported scalar
 set is visible where you read the interface.
 
@@ -146,27 +148,27 @@ the stubs are filled in.
 
 ## Roadmap
 
-Build order, tracked in [`PLAN.md`](PLAN.md); each item depends only on the ones above it. Status: `[x]` done ·
-`[o]` in progress · `[ ]` not started.
+Build order, tracked in [`PLAN.md`](PLAN.md); each item depends only on the ones above it. Status: `[x]` done · `[o]` in
+progress · `[ ]` not started.
 
 ### Phase 0 — Foundations
 
-| Status | Component  | File                      | Notes                                          |
-| ------ | ---------- | ------------------------- | ---------------------------------------------- |
-| `[x]`  | Traits     | `src/core/Traits.cpp`     | —                                              |
-| `[x]`  | MatrixView | `src/core/MatrixView.cpp` | —                                              |
-| `[x]`  | Exceptions | `src/core/Exceptions.cpp` | —                                              |
-| `[x]`  | Vector     | `src/core/Vector.cpp`     | —                                              |
+| Status | Component  | File                      | Notes                                                      |
+| ------ | ---------- | ------------------------- | ---------------------------------------------------------- |
+| `[x]`  | Traits     | `src/core/Traits.cpp`     | —                                                          |
+| `[x]`  | MatrixView | `src/core/MatrixView.cpp` | —                                                          |
+| `[x]`  | Exceptions | `src/core/Exceptions.cpp` | —                                                          |
+| `[x]`  | Vector     | `src/core/Vector.cpp`     | —                                                          |
 | `[o]`  | Matrix     | `src/core/Matrix.cpp`     | core members done; decomposition-backed summaries deferred |
 
 ### Phase 1 — Kernels and reflectors
 
-| Status | Component   | File                      | Notes                                                   |
-| ------ | ----------- | ------------------------- | ------------------------------------------------------- |
-| `[x]`  | Kernels     | `src/ops/Kernels.cpp`     | reference level 1/2/3; blocked internals are Phase 6    |
+| Status | Component   | File                      | Notes                                                         |
+| ------ | ----------- | ------------------------- | ------------------------------------------------------------- |
+| `[x]`  | Kernels     | `src/ops/Kernels.cpp`     | reference level 1/2/3; blocked internals are Phase 6          |
 | `[o]`  | Norm        | `src/ops/Norm.cpp`        | vector & entrywise done; `matrixTwo`/`matrixNuclear` need SVD |
-| `[x]`  | Householder | `src/ops/Householder.cpp` | reflector done; compact-WY (Phase 6) deferred           |
-| `[x]`  | Givens      | `src/ops/Givens.cpp`      | —                                                       |
+| `[x]`  | Householder | `src/ops/Householder.cpp` | reflector done; compact-WY (Phase 6) deferred                 |
+| `[x]`  | Givens      | `src/ops/Givens.cpp`      | —                                                             |
 
 ### Phase 2 — Triangular solves and first factorizations
 
