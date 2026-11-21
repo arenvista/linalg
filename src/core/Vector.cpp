@@ -456,7 +456,7 @@ template <typename T> void Vector<T>::resize(Index size) {
 }
 
 template <typename T> void Vector<T>::conservativeResize(Index size) {
-    throw LinalgError("not implemented: linalg::Vector<T>::conservativeResize");
+    storage_.resize(size);
 }
 
 template <typename T> void Vector<T>::fill(const T &value) {
