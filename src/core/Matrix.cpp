@@ -696,9 +696,7 @@ void Matrix<T>::resize(Index rows,
 template <typename T>
 void Matrix<T>::conservativeResize(Index rows,
                                    Index cols) {
-    throw LinalgError("not implemented: linalg::Matrix<T>::conservativeReSize");
-
-    /*// Row-major means growing the column count moves every row, so this
+    // Row-major means growing the column count moves every row, so this
     // rebuilds rather than resizing the buffer in place.
     Matrix       result(rows, cols);
     const Index  keptRows = (rows < rows_) ? rows : rows_;
@@ -708,7 +706,7 @@ void Matrix<T>::conservativeResize(Index rows,
             result(i, j) = (*this)(i, j);
         }
     }
-    swap(result); // growth stays zero-filled from result's construction*/
+    swap(result); // growth stays zero-filled from result's construction
 }
 
 template <typename T>
