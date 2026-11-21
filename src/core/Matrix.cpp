@@ -953,7 +953,17 @@ template <typename T> Matrix<T> Matrix<T>::pseudoInverse(Real tolerance) const {
 
 template <typename T>
 Matrix<T> Matrix<T>::triangularPart(Triangle::Kind which) const {
-    throw LinalgError("not implemented: linalg::Matrix<T>::triangularPart");
+    const bool upper = (which == Triangle::Kind::Upper);
+    Matrix result(rows_, cols_);
+    for (Index i = 0; i < rows_; ++i) {
+        for (Index j = 0; j < cols_; ++j) {
+            const bool keep = upper ? (i <= j) : (i >= j);
+            if (keep) {
+                result(i, j) = (*this)(i, j);
+            }
+        }
+    }
+    return result;
 }
 
 template <typename T> Matrix<T> Matrix<T>::symmetricPart() const {
