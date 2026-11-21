@@ -26,6 +26,24 @@ target_compile_options(test_kernels PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
 add_test(NAME kernels COMMAND test_kernels)
 
 
+# Tests for the exception types
+add_executable(test_exceptions test_exceptions.cpp)
+target_link_libraries(test_exceptions PRIVATE linalg::linalg)
+target_compile_options(test_exceptions PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
+add_test(NAME exceptions COMMAND test_exceptions)
+
+# Tests for NumericTraits
+add_executable(test_traits test_traits.cpp)
+target_link_libraries(test_traits PRIVATE linalg::linalg)
+target_compile_options(test_traits PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
+add_test(NAME traits COMMAND test_traits)
+
+# Tests for MatrixView
+add_executable(test_matrixview test_matrixview.cpp)
+target_link_libraries(test_matrixview PRIVATE linalg::linalg)
+target_compile_options(test_matrixview PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
+add_test(NAME matrixview COMMAND test_matrixview)
+
 # Suites written ahead of the implementation (see harness.hpp): tests whose
 # methods are still "not implemented" stubs report as Skipped via exit code
 # 77, and flip to Passed/Failed as the methods land. Add later phases
